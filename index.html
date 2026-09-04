@@ -409,6 +409,89 @@
   .photo-thumb .photo-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.6);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
   .photo-thumb .photo-del svg{width:12px;height:12px;stroke:#fff;}
   .photo-actions{display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;}
+
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+  .rf-modal{
+    --rf-paper:#f2f5f3; --rf-paper-raised:#ffffff; --rf-ink:#16231e; --rf-ink-soft:#4c5a54; --rf-ink-faint:#7c8983;
+    --rf-line:#dbe3de; --rf-line-strong:#c3cec8; --rf-accent:#1f6f5c; --rf-accent-soft:#e4efec;
+    --rf-warm:#c96a2e; --rf-warm-soft:#f6e6da; --rf-alert:#a8382c; --rf-alert-soft:#f6e2df;
+    --rf-shadow:0 1px 2px rgba(22,35,30,0.06), 0 8px 24px -16px rgba(22,35,30,0.18);
+    background:var(--rf-paper); color:var(--rf-ink); font-family:'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    border-radius:10px; padding:4px 2px 2px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) .rf-modal{
+      --rf-paper:#141b18; --rf-paper-raised:#1b2420; --rf-ink:#e9efec; --rf-ink-soft:#aab8b1; --rf-ink-faint:#7c8983;
+      --rf-line:#2a3530; --rf-line-strong:#3a4740; --rf-accent:#5fbfa4; --rf-accent-soft:#1e2f29;
+      --rf-warm:#e08a52; --rf-warm-soft:#33261c; --rf-alert:#e08177; --rf-alert-soft:#3a221f;
+    }
+  }
+  :root[data-theme="dark"] .rf-modal{
+    --rf-paper:#141b18; --rf-paper-raised:#1b2420; --rf-ink:#e9efec; --rf-ink-soft:#aab8b1; --rf-ink-faint:#7c8983;
+    --rf-line:#2a3530; --rf-line-strong:#3a4740; --rf-accent:#5fbfa4; --rf-accent-soft:#1e2f29;
+    --rf-warm:#e08a52; --rf-warm-soft:#33261c; --rf-alert:#e08177; --rf-alert-soft:#3a221f;
+  }
+  .rf-modal *{box-sizing:border-box;}
+  .rf-eyebrow{font-family:'Barlow Condensed',sans-serif; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; font-size:11px; color:var(--rf-accent); margin:6px 2px 2px;}
+  .rf-h1{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:22px; line-height:1.1; margin:4px 2px 8px; color:var(--rf-ink);}
+  .rf-tabs{display:flex; gap:6px; background:var(--rf-paper-raised); border:1px solid var(--rf-line); border-radius:99px; padding:5px; margin:4px 2px 18px; width:fit-content; box-shadow:var(--rf-shadow);}
+  .rf-tab-btn{font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13.5px; letter-spacing:0.02em; color:var(--rf-ink-soft); background:transparent; border:none; border-radius:99px; padding:8px 18px; cursor:pointer;}
+  .rf-tab-btn.active{background:var(--rf-accent); color:#fff;}
+  .rf-idbar{background:var(--rf-paper-raised); border:1px solid var(--rf-line); border-radius:8px; padding:14px 16px; margin:0 2px 16px; box-shadow:var(--rf-shadow); display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px 16px;}
+  .rf-field label{display:block; font-family:'Barlow Condensed',sans-serif; font-size:10px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:var(--rf-ink-faint); margin-bottom:3px;}
+  .rf-field input, .rf-field select{width:100%; border:none; border-bottom:1px solid var(--rf-line-strong); background:transparent; font-family:'IBM Plex Sans',sans-serif; font-size:13.5px; color:var(--rf-ink); padding:3px 2px;}
+  .rf-field input:focus, .rf-field select:focus{outline:none; border-bottom-color:var(--rf-accent);}
+  .rf-block{margin:0 2px 30px;}
+  .rf-block-head{display:flex; align-items:baseline; gap:10px; border-bottom:1px solid var(--rf-line-strong); padding-bottom:8px; margin-bottom:14px;}
+  .rf-block-num{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--rf-ink-faint);}
+  .rf-block-head h4{font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:600; margin:0; flex:1; color:var(--rf-ink);}
+  .rf-card{background:var(--rf-paper-raised); border:1px solid var(--rf-line); border-radius:8px; padding:16px 18px; box-shadow:var(--rf-shadow); margin-bottom:14px;}
+  .rf-row-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px 18px;}
+  .rf-row-grid.wide{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
+  .rf-check-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:7px 14px; margin:4px 0 0;}
+  .rf-opt{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--rf-ink-soft); cursor:pointer;}
+  .rf-opt input{width:auto; flex:none; accent-color:var(--rf-accent);}
+  .rf-subhead{font-family:'Barlow Condensed',sans-serif; font-size:11.5px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--rf-ink-faint); margin:14px 0 7px;}
+  .rf-subhead:first-child{margin-top:0;}
+  .rf-modal textarea{width:100%; border:1px solid var(--rf-line-strong); border-radius:5px; background:var(--rf-paper); color:var(--rf-ink); font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:7px 9px; resize:vertical; min-height:34px;}
+  .rf-modal textarea:focus{outline:none; border-color:var(--rf-accent);}
+  .rf-flagbar{display:flex; align-items:center; gap:10px; padding:12px 16px; border-radius:8px; font-size:13px; font-weight:500; margin-bottom:14px; border:1px solid var(--rf-line); background:var(--rf-accent-soft); color:var(--rf-accent);}
+  .rf-flagbar.warn{background:var(--rf-alert-soft); color:var(--rf-alert); border-color:var(--rf-alert);}
+  .rf-flagbar .rf-dot{width:8px; height:8px; border-radius:50%; background:currentColor; flex:none;}
+  .rf-tablewrap{overflow-x:auto; margin:0 0 6px;}
+  .rf-modal table{border-collapse:collapse; width:100%; min-width:520px; font-size:13px;}
+  .rf-modal table.rf-compare{min-width:640px;}
+  .rf-modal th{font-family:'Barlow Condensed',sans-serif; font-weight:600; letter-spacing:0.02em; text-transform:uppercase; font-size:10.5px; color:var(--rf-ink-faint); text-align:left; padding:0 8px 6px 0; border-bottom:1px solid var(--rf-line-strong);}
+  .rf-modal th.rf-grp{text-align:center; color:var(--rf-ink-soft);}
+  .rf-modal td{padding:8px 8px 8px 0; border-bottom:1px solid var(--rf-line); color:var(--rf-ink-soft); vertical-align:middle;}
+  .rf-modal td:first-child{color:var(--rf-ink); font-weight:500;}
+  .rf-modal td.rf-region{color:var(--rf-ink-faint); font-family:'Barlow Condensed',sans-serif; font-size:10.5px; text-transform:uppercase; letter-spacing:0.03em; font-weight:600; white-space:nowrap;}
+  .rf-modal td input[type="text"], .rf-modal td input[type="number"]{width:100%; border:none; border-bottom:1px solid var(--rf-line-strong); background:transparent; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--rf-ink); padding:4px 2px;}
+  .rf-modal td input:focus{outline:none; border-bottom-color:var(--rf-accent);}
+  .rf-modal td.rf-result{font-family:'IBM Plex Mono',monospace; font-weight:600; text-align:center; white-space:nowrap;}
+  .rf-modal td.rf-result.good{color:var(--rf-accent);}
+  .rf-modal td.rf-result.warn{color:var(--rf-warm);}
+  .rf-modal td.rf-result.bad{color:var(--rf-alert);}
+  .rf-modal td.rf-prevcol{color:var(--rf-ink-faint); font-family:'IBM Plex Mono',monospace; font-size:12.5px;}
+  .rf-hint{font-size:11px; color:var(--rf-ink-faint); margin:2px 0 12px;}
+  .rf-semaphore{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:9px; margin:6px 0 0;}
+  .rf-semopt{border:1px solid var(--rf-line); border-radius:6px; padding:10px 12px; cursor:pointer; display:flex; gap:8px; align-items:flex-start; font-size:12.5px; color:var(--rf-ink-soft); background:var(--rf-paper-raised);}
+  .rf-semopt input{margin-top:2px; accent-color:var(--rf-accent);}
+  .rf-semopt b{color:var(--rf-ink); display:block; font-family:'Barlow Condensed',sans-serif; font-size:13.5px; font-weight:600;}
+  .rf-semopt.green b{color:var(--rf-accent);} .rf-semopt.amber b{color:var(--rf-warm);} .rf-semopt.red b{color:var(--rf-alert);}
+  .rf-suggestion{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--rf-ink-faint); margin:9px 0 0;}
+  .rf-suggestion b{color:var(--rf-ink);}
+  .rf-output-row{display:flex; flex-wrap:wrap; gap:9px; margin-top:12px;}
+  .rf-output-pill{font-family:'IBM Plex Mono',monospace; font-size:12px; background:var(--rf-paper); border:1px solid var(--rf-line-strong); border-radius:6px; padding:7px 12px; color:var(--rf-ink-soft);}
+  .rf-output-pill b{color:var(--rf-ink); font-size:13px;}
+  .rf-output-pill.good{border-color:var(--rf-accent); color:var(--rf-accent);}
+  .rf-output-pill.warn{border-color:var(--rf-warm); color:var(--rf-warm);}
+  .rf-output-pill.bad{border-color:var(--rf-alert); color:var(--rf-alert);}
+  .rf-scale{display:flex; align-items:center; gap:9px; margin-top:5px;}
+  .rf-scale-label{font-size:11px; color:var(--rf-ink-faint); font-family:'IBM Plex Mono',monospace; flex:none;}
+  .rf-scale input[type="range"]{flex:1; accent-color:var(--rf-accent);}
+  .rf-scale output{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:14px; color:var(--rf-ink); width:24px; text-align:right;}
+  @media (max-width:600px){ .rf-row-grid, .rf-row-grid.wide{grid-template-columns:1fr;} }
   .fc-row-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
   @media (max-width:600px){.fc-row-3{grid-template-columns:1fr;}}
   .fc-testrow{display:grid;grid-template-columns:1.6fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);}
@@ -690,6 +773,79 @@ const uid = () => 'id-'+Math.random().toString(36).slice(2,10)+Date.now().toStri
 function initials(name){ if(!name) return '?'; const p=name.trim().split(/\s+/); return ((p[0]?.[0]||'')+(p[1]?.[0]||'')).toUpperCase(); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(showToast._t); showToast._t=setTimeout(()=>t.classList.remove('show'),2400); }
+
+
+/* ---------- RICH FICHA (MMSS/MMII) HELPERS ---------- */
+function rfCheckGrid(items, selected, cls){
+  selected = selected || [];
+  return items.map(function(o){ return '<label class="rf-opt"><input type="checkbox" class="' + cls + '" value="' + escapeHtml(o) + '" ' + (selected.indexOf(o)>-1?'checked':'') + '/><span>' + escapeHtml(o) + '</span></label>'; }).join('');
+}
+function rfTestRowHtml(name, unit, dVal, eVal){
+  var label = escapeHtml(name) + (unit ? ' <span class="rf-hint" style="display:inline;margin:0;">(' + escapeHtml(unit) + ')</span>' : '');
+  return '<tr data-lsi><td>' + label + '</td><td><input type="number" step="0.1" class="val-d" value="' + (dVal==null?'':dVal) + '"></td><td><input type="number" step="0.1" class="val-e" value="' + (eVal==null?'':eVal) + '"></td><td class="rf-result">\u2014</td></tr>';
+}
+function rfCompareRowHtml(name, prevD, prevE, curD, curE){
+  var pd = (prevD==null||prevD==='') ? '\u2014' : prevD;
+  var pe = (prevE==null||prevE==='') ? '\u2014' : prevE;
+  return '<tr data-lsi-reav data-prev-d="' + (prevD==null?'':prevD) + '" data-prev-e="' + (prevE==null?'':prevE) + '"><td>' + escapeHtml(name) + '</td><td class="rf-prevcol">' + pd + '</td><td class="rf-prevcol">' + pe + '</td><td><input type="number" step="0.1" class="cur-d" value="' + (curD==null?'':curD) + '"></td><td><input type="number" step="0.1" class="cur-e" value="' + (curE==null?'':curE) + '"></td><td class="rf-result">\u2014</td><td class="rf-evo">\u2014</td></tr>';
+}
+function rfMobilityRowHtml(item, val){
+  val = val || {};
+  var ph = item.ph || '';
+  return '<tr><td class="rf-region">' + escapeHtml(item.region) + '</td><td>' + escapeHtml(item.test) + '</td><td><input type="text" class="rf-mob-d" placeholder="' + escapeHtml(ph) + '" value="' + escapeHtml(val.d||'') + '"></td><td><input type="text" class="rf-mob-e" placeholder="' + escapeHtml(ph) + '" value="' + escapeHtml(val.e||'') + '"></td><td><input type="text" class="rf-mob-o" value="' + escapeHtml(val.obs||'') + '"></td></tr>';
+}
+function rfStabilityRowHtml(item, val){
+  val = val || {};
+  if(item.bilateral){
+    return '<tr><td class="rf-region">' + escapeHtml(item.region) + '</td><td>' + escapeHtml(item.test) + '</td><td colspan="2"><input type="text" class="rf-st-b" placeholder="bilateral" value="' + escapeHtml(val.b||'') + '"></td><td><input type="text" class="rf-st-o" value="' + escapeHtml(val.obs||'') + '"></td></tr>';
+  }
+  var ph = item.ph || '';
+  return '<tr><td class="rf-region">' + escapeHtml(item.region) + '</td><td>' + escapeHtml(item.test) + '</td><td><input type="text" class="rf-st-d" placeholder="' + escapeHtml(ph) + '" value="' + escapeHtml(val.d||'') + '"></td><td><input type="text" class="rf-st-e" placeholder="' + escapeHtml(ph) + '" value="' + escapeHtml(val.e||'') + '"></td><td><input type="text" class="rf-st-o" value="' + escapeHtml(val.obs||'') + '"></td></tr>';
+}
+function rfWireLsiTable(root, selector){
+  root.querySelectorAll(selector).forEach(function(row){
+    var d = row.querySelector('.val-d'), e = row.querySelector('.val-e'), out = row.querySelector('.rf-result');
+    function calc(){
+      var pct = lsiPercent(d.value, e.value);
+      if(pct==null){ out.textContent = '\u2014'; out.className = 'rf-result'; return; }
+      out.textContent = pct + '%';
+      out.className = 'rf-result ' + (pct>=90?'good':pct>=80?'warn':'bad');
+    }
+    d.addEventListener('input', calc); e.addEventListener('input', calc); calc();
+  });
+}
+function rfWireCompareTable(root, selector){
+  root.querySelectorAll(selector).forEach(function(row){
+    var cd = row.querySelector('.cur-d'), ce = row.querySelector('.cur-e'), out = row.querySelector('.rf-result'), evo = row.querySelector('.rf-evo');
+    var pdv = parseFloat(row.dataset.prevD), pev = parseFloat(row.dataset.prevE);
+    function calc(){
+      var pct = lsiPercent(cd.value, ce.value);
+      if(pct==null){ out.textContent = '\u2014'; out.className = 'rf-result'; }
+      else { out.textContent = pct + '%'; out.className = 'rf-result ' + (pct>=90?'good':pct>=80?'warn':'bad'); }
+      var cdv = parseFloat(cd.value), cev = parseFloat(ce.value);
+      if(isNaN(pdv) || isNaN(pev) || isNaN(cdv) || isNaN(cev)){ evo.textContent = '\u2014'; evo.style.color=''; return; }
+      var prevSum = pdv + pev, curSum = cdv + cev;
+      var diff = prevSum === 0 ? 0 : (curSum - prevSum) / prevSum;
+      if(diff > 0.05){ evo.textContent = '\u2191 melhora'; evo.style.color = 'var(--rf-accent)'; }
+      else if(diff < -0.05){ evo.textContent = '\u2193 aten\u00e7\u00e3o'; evo.style.color = 'var(--rf-alert)'; }
+      else { evo.textContent = '\u2192 est\u00e1vel'; evo.style.color = 'var(--rf-ink-faint)'; }
+    }
+    cd.addEventListener('input', calc); ce.addEventListener('input', calc); calc();
+  });
+}
+function rfWireFlagGroup(root, flagSelector, barId, textId, noneMsg, someMsg){
+  var bar = root.querySelector('#'+barId), text = root.querySelector('#'+textId);
+  var flags = root.querySelectorAll(flagSelector);
+  function update(){
+    var count = 0; flags.forEach(function(f){ if(f.checked) count++; });
+    if(count>0){ bar.classList.add('warn'); text.textContent = count + (count===1?' sinal de alerta marcado':' sinais de alerta marcados') + someMsg; }
+    else { bar.classList.remove('warn'); text.textContent = noneMsg; }
+    return count;
+  }
+  flags.forEach(function(f){ f.addEventListener('change', update); });
+  update();
+  return update;
+}
 
 /* ---------- PHOTO CAPTURE / UPLOAD (fichas de avaliacao) ---------- */
 function compressImageFile(file, maxDim, quality){
@@ -2665,6 +2821,48 @@ const FICHA_TEMPLATES = {
         "name": "Lançamento unilateral sentado",
         "unit": "cm"
       }
+    ],
+    "historyOptions": [
+      "Aumento recente de volume/intensidade",
+      "Mudança recente de gesto técnico ou equipamento",
+      "Postura/ergonomia nova (trabalho, treino)"
+    ],
+    "mobilityTests": [
+      { "region": "Torácica", "test": "Rotação de tronco (graus)" },
+      { "region": "Ombro", "test": "Flexão (graus)" },
+      { "region": "Ombro", "test": "Abdução (graus)" },
+      { "region": "Ombro", "test": "Rotação externa (graus)" },
+      { "region": "Ombro", "test": "Apley scratch test (nível vertebral alcançado)" }
+    ],
+    "strengthTests": [
+      { "name": "Flexão de cotovelo", "unit": "kgf" },
+      { "name": "Extensão de cotovelo", "unit": "kgf" },
+      { "name": "Rotação externa de ombro", "unit": "kgf" },
+      { "name": "Rotação interna de ombro", "unit": "kgf" }
+    ],
+    "stabilityTests": [
+      { "region": "MMSS", "test": "Wall slide / wall angel — qualidade (desvio de escápula)", "ph": "S/N" },
+      { "region": "Tronco", "test": "Plank — prancha ventral (tempo até quebra, s)", "bilateral": true },
+      { "region": "Tronco", "test": "Side plank — prancha lateral (tempo até quebra, s)" }
+    ],
+    "balanceDirs": ["Medial", "Inferolateral", "Superolateral"],
+    "balanceAsymLabel": "Assimetria alcance medial",
+    "powerTests": [
+      { "name": "Lançamento unilateral sentado (single-arm seated shot put)", "unit": "cm" }
+    ],
+    "powerBilateral": { "label": "Arremesso de medicine ball sentado (seated chest pass) — bilateral", "unit": "cm", "methodPh": "ex.: 3kg, medido com trena no chão" },
+    "objectivePlaceholder": "ex.: nadar 1000m contínuos com dor \u22643/10",
+    "riskFlagsReav": [
+      "Edema ou hematoma novo",
+      "Deformidade / instabilidade nova",
+      "Dor noturna ou em repouso, sem relação com esforço",
+      "Dor em região diferente da queixa original"
+    ],
+    "whatChangedOptions": [
+      "Aumentou volume/intensidade de treino",
+      "Mudou gesto técnico ou equipamento",
+      "Perdeu sessões de fortalecimento em casa",
+      "Sono/estresse mudou desde a última visita"
     ]
   },
   "mmii": {
@@ -2722,6 +2920,56 @@ const FICHA_TEMPLATES = {
         "name": "Equilíbrio unipodal olhos fechados",
         "unit": "s"
       }
+    ],
+    "historyOptions": [
+      "Aumento recente de volume/intensidade",
+      "Mudança recente de terreno (ladeira, trilha)",
+      "Calçado novo ou desgastado"
+    ],
+    "mobilityTests": [
+      { "region": "Tornozelo", "test": "Knee to wall (dorsiflexão, cm da parede)" },
+      { "region": "Quadril", "test": "Rotação interna (RI, graus)" },
+      { "region": "Quadril", "test": "Rotação externa (RE, graus)" },
+      { "region": "Quadril", "test": "Thomas test (encurtamento flexores/reto femoral)", "ph": "+/\u2212" },
+      { "region": "Quadril", "test": "Trendelenburg (apoio unipodal 30s)", "ph": "+/\u2212" },
+      { "region": "Cadeia posterior", "test": "Active Knee Extension \u2014 AKE (graus de d\u00e9ficit)" },
+      { "region": "Cadeia posterior", "test": "Ely\u2019s test (reto femoral)", "ph": "+/\u2212" }
+    ],
+    "strengthTests": [
+      { "name": "Extensão de joelho", "unit": "kgf" },
+      { "name": "Flexão de joelho", "unit": "kgf" },
+      { "name": "Abdução de quadril", "unit": "kgf" },
+      { "name": "Adução de quadril", "unit": "kgf" },
+      { "name": "Extensão de quadril", "unit": "kgf" },
+      { "name": "Flexão de quadril", "unit": "kgf" }
+    ],
+    "stabilityTests": [
+      { "region": "MMII", "test": "Single-Leg Squat — qualidade (valgo dinâmico / queda pélvica)", "ph": "S/N" },
+      { "region": "Tronco", "test": "Plank — prancha ventral (tempo até quebra, s)", "bilateral": true },
+      { "region": "Tronco", "test": "Side plank — prancha lateral (tempo até quebra, s)" }
+    ],
+    "staticBalanceTest": { "name": "Apoio unipodal, olhos fechados (s, teto 30)", "unit": "s", "max": 30 },
+    "balanceDirs": ["Anterior", "Posteromedial", "Posterolateral"],
+    "balanceAsymLabel": "Assimetria alcance anterior",
+    "powerTests": [
+      { "name": "Agachamento unipodal — reps limpos até compensação", "unit": "reps" },
+      { "name": "Step-down — reps limpos até desvio de joelho", "unit": "reps" },
+      { "name": "Calf raise — reps até falha", "unit": "reps" },
+      { "name": "Single-Leg Hop for Distance (salto horizontal unipodal)", "unit": "cm" }
+    ],
+    "powerBilateral": { "label": "Countermovement Jump (CMJ) — bilateral", "unit": "cm", "methodPh": "app de vídeo, tapete de contato, estimativa visual..." },
+    "objectivePlaceholder": "ex.: correr 5km contínuos com dor \u22643/10",
+    "riskFlagsReav": [
+      "Edema ou hematoma novo",
+      "Incapacidade de apoiar o peso / claudicação nova",
+      "Dor noturna ou em repouso, sem relação com esforço",
+      "Dor em região diferente da queixa original"
+    ],
+    "whatChangedOptions": [
+      "Aumentou volume/intensidade de corrida",
+      "Mudou calçado ou terreno",
+      "Perdeu sessões de fortalecimento em casa",
+      "Sono/estresse mudou desde a última visita"
     ]
   }
 };
@@ -3039,6 +3287,7 @@ function buildLineChartSVG(points){
 
 function openAssessmentForm(client, existing, fichaTypeParam){
   const fichaType = fichaTypeParam || (existing && existing.fichaType) || 'livre';
+  if(fichaType === 'mmss' || fichaType === 'mmii'){ return openRichFichaForm(client, existing, fichaType); }
   if(fichaType !== 'livre'){ return openFichaAssessmentForm(client, existing, fichaType); }
 
   const isEdit = !!existing;
@@ -3097,6 +3346,500 @@ function openAssessmentForm(client, existing, fichaTypeParam){
       const payload = { clientId:client.id, clientName:client.name, date, notes, measurements, photos:photosState, fichaType:'livre' };
       if(isEdit) await Store.update('assessments', existing.id, payload); else await Store.add('assessments', payload);
       showToast(isEdit?'Avaliação atualizada':'Avaliação registrada'); closeModal();
+    });
+  }, {wide:true});
+}
+
+
+function openRichFichaForm(client, existing, fichaType){
+  var cfg = FICHA_TEMPLATES[fichaType];
+  var isEdit = !!existing;
+  var priorRecords = Store.data.assessments.filter(function(a){ return a.clientId===client.id && a.fichaType===fichaType && (!existing || a.id!==existing.id); }).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var prevSource = priorRecords[0] || null;
+  var priorInitial = priorRecords.filter(function(a){ return a.stage!=='reav'; })[0] || null;
+  var activeStage = existing ? (existing.stage||'inicial') : (priorRecords.length ? 'reav' : 'inicial');
+
+  var age = (existing && existing.age) || '';
+  var modality = (existing && existing.modality) || '';
+  var eventDate = (existing && existing.eventDate) || '';
+  var evaluator = (existing && existing.evaluator) || '';
+  var ctx = (existing && existing.context) || {};
+  var complaint = (existing && existing.complaint) || {};
+  var complaintLocs = complaint.locations || [];
+  var riskFlags = (existing && existing.riskFlags) || [];
+  var history = (existing && existing.history) || {};
+  var historyChanges = history.changes || [];
+  var mobility = (existing && existing.mobility) || [];
+  var testResults = (existing && existing.testResults) || {};
+  var stability = (existing && existing.stability) || [];
+  var balance = (existing && existing.balance) || {};
+  var balanceDirs = balance.dirs || [];
+  var powerResults = (existing && existing.powerResults) || {};
+  var powerBilateral = (existing && existing.powerBilateral) || {};
+  var semaphore = (existing && existing.semaphore) || (riskFlags.length>0 ? 'vermelho' : 'verde');
+  var conduct = (existing && existing.conduct) || [];
+  var nextReview = (existing && existing.nextReview) || '';
+  var functionalGoal = (existing && existing.functionalGoal) || '';
+  var reav = (existing && existing.reav) || {};
+  var reavFlags = reav.riskFlags || [];
+  var reavChanged = reav.whatChanged || [];
+
+  var prevTestResults = (prevSource && prevSource.testResults) || {};
+  var prevPowerResults = (prevSource && prevSource.powerResults) || {};
+  var prevPowerBilateral = (prevSource && prevSource.powerBilateral) || {};
+  var prevStaticBalance = (prevSource && prevSource.balance && prevSource.balance.staticTest) || {};
+
+  var mobilityRowsHtml = cfg.mobilityTests.map(function(item, i){ return rfMobilityRowHtml(item, mobility[i]); }).join('');
+  var strengthRowsHtml = cfg.strengthTests.map(function(item){ var v = testResults[item.name]||{}; return rfTestRowHtml(item.name, item.unit, v.d, v.e); }).join('');
+  var stabilityRowsHtml = cfg.stabilityTests.map(function(item, i){ return rfStabilityRowHtml(item, stability[i]); }).join('');
+  var powerRowsHtml = cfg.powerTests.map(function(item){ var v = powerResults[item.name]||{}; return rfTestRowHtml(item.name, item.unit, v.d, v.e); }).join('');
+  var staticBalanceRowHtml = cfg.staticBalanceTest ? rfTestRowHtml(cfg.staticBalanceTest.name, cfg.staticBalanceTest.unit, balance.staticD, balance.staticE) : '';
+
+  var strengthCompareRowsHtml = cfg.strengthTests.map(function(item){ var pv = prevTestResults[item.name]||{}; var cv = testResults[item.name]||{}; return rfCompareRowHtml(item.name, pv.d, pv.e, cv.d, cv.e); }).join('');
+  var powerCompareRowsHtml = cfg.powerTests.map(function(item){ var pv = prevPowerResults[item.name]||{}; var cv = powerResults[item.name]||{}; return rfCompareRowHtml(item.name, pv.d, pv.e, cv.d, cv.e); }).join('') + (cfg.staticBalanceTest ? rfCompareRowHtml(cfg.staticBalanceTest.name, prevStaticBalance.d, prevStaticBalance.e, balance.staticD, balance.staticE) : '');
+
+  var inicialHtml = '' +
+    '<div class="rf-idbar">' +
+      '<div class="rf-field"><label>Idade</label><input id="ri-age" type="text" value="' + escapeHtml(age) + '"></div>' +
+      '<div class="rf-field"><label>Modalidade / atividade</label><input id="ri-modality" type="text" value="' + escapeHtml(modality) + '"></div>' +
+      '<div class="rf-field"><label>Data de eventual prova</label><input id="ri-eventdate" type="date" value="' + (eventDate||'') + '"></div>' +
+      '<div class="rf-field"><label>Avaliador(a)</label><input id="ri-evaluator" type="text" value="' + escapeHtml(evaluator) + '"></div>' +
+    '</div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">00</span><h4>Perfil e contexto</h4></div><div class="rf-card">' +
+      '<div class="rf-row-grid">' +
+        '<div class="rf-field"><label>Objetivo</label><input id="ri-ctx-goal" type="text" value="' + escapeHtml(ctx.goal||'') + '"></div>' +
+        '<div class="rf-field"><label>Frequ\u00eancia</label><input id="ri-ctx-freq" type="text" placeholder="dias/semana" value="' + escapeHtml(ctx.frequency||'') + '"></div>' +
+        '<div class="rf-field"><label>Volume</label><input id="ri-ctx-volume" type="text" value="' + escapeHtml(ctx.volume||'') + '"></div>' +
+      '</div>' +
+      '<div class="rf-row-grid wide" style="margin-top:14px;">' +
+        '<div class="rf-field"><label>Hist\u00f3rico de les\u00f5es</label><textarea id="ri-ctx-injuries" rows="2">' + escapeHtml(ctx.injuryHistory||'') + '</textarea></div>' +
+        '<div class="rf-field"><label>Dores atuais</label><textarea id="ri-ctx-pain" rows="2">' + escapeHtml(ctx.currentPain||'') + '</textarea></div>' +
+        '<div class="rf-field"><label>Rotina profissional</label><textarea id="ri-ctx-work" rows="2">' + escapeHtml(ctx.workRoutine||'') + '</textarea></div>' +
+        '<div class="rf-field"><label>Sono / recupera\u00e7\u00e3o</label><textarea id="ri-ctx-sleep" rows="2">' + escapeHtml(ctx.sleep||'') + '</textarea></div>' +
+        '<div class="rf-field"><label>Principais dificuldades</label><textarea id="ri-ctx-difficulties" rows="2">' + escapeHtml(ctx.difficulties||'') + '</textarea></div>' +
+        '<div class="rf-field"><label>O que quer melhorar</label><textarea id="ri-ctx-improve" rows="2">' + escapeHtml(ctx.improve||'') + '</textarea></div>' +
+      '</div>' +
+    '</div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">01</span><h4>Queixa principal</h4></div><div class="rf-card">' +
+      '<p class="rf-subhead">Localiza\u00e7\u00e3o</p><div class="rf-check-grid">' + rfCheckGrid(cfg.complaintLocations, complaintLocs, 'rf-loc-i') + '</div>' +
+      '<div class="rf-row-grid" style="margin-top:12px;">' +
+        '<div class="rf-field"><label>Lado</label><select id="ri-c-side"><option value="D" ' + (complaint.side==='D'?'selected':'') + '>Direito</option><option value="E" ' + (complaint.side==='E'?'selected':'') + '>Esquerdo</option><option value="B" ' + (complaint.side==='B'?'selected':'') + '>Bilateral</option><option value="NA" ' + (!complaint.side||complaint.side==='NA'?'selected':'') + '>N/A</option></select></div>' +
+        '<div class="rf-field"><label>In\u00edcio</label><select id="ri-c-onset"><option value="Subito" ' + (complaint.onsetType==='Subito'?'selected':'') + '>S\u00fabito</option><option value="Gradual" ' + (complaint.onsetType==='Gradual'?'selected':'') + '>Gradual</option></select></div>' +
+        '<div class="rf-field"><label>H\u00e1 quanto tempo</label><input id="ri-c-duration" type="text" placeholder="ex.: 3 semanas" value="' + escapeHtml(complaint.duration||'') + '"></div>' +
+      '</div>' +
+      '<p class="rf-subhead" style="margin-top:12px;">Comportamento da dor</p>' +
+      '<div class="rf-check-grid">' +
+        '<label class="rf-opt"><input type="checkbox" id="ri-c-worse-during" ' + (complaint.worseDuring?'checked':'') + '/><span>Piora ao longo da atividade</span></label>' +
+        '<label class="rf-opt"><input type="checkbox" id="ri-c-worse-after" ' + (complaint.worseAfter?'checked':'') + '/><span>Piora s\u00f3 depois da atividade</span></label>' +
+        '<label class="rf-opt"><input type="checkbox" class="rf-flag-i" value="Dor em repouso, sem rela\u00e7\u00e3o com esfor\u00e7o" ' + (riskFlags.indexOf('Dor em repouso, sem rela\u00e7\u00e3o com esfor\u00e7o')>-1?'checked':'') + '/><span>Dor em repouso, sem rela\u00e7\u00e3o com esfor\u00e7o</span></label>' +
+        '<label class="rf-opt"><input type="checkbox" class="rf-flag-i" value="Dor noturna / acorda o paciente" ' + (riskFlags.indexOf('Dor noturna / acorda o paciente')>-1?'checked':'') + '/><span>Dor noturna / acorda o paciente</span></label>' +
+      '</div>' +
+      '<p class="rf-subhead" style="margin-top:12px;">Escala de dor (EVA 0\u201310)</p>' +
+      '<div class="rf-row-grid">' +
+        '<div><span class="rf-scale-label">Agora</span><div class="rf-scale"><input id="ri-eva-now" type="range" min="0" max="10" value="' + (complaint.evaNow??0) + '" oninput="this.nextElementSibling.value=this.value"><output>' + (complaint.evaNow??0) + '</output></div></div>' +
+        '<div><span class="rf-scale-label">Pior momento</span><div class="rf-scale"><input id="ri-eva-worst" type="range" min="0" max="10" value="' + (complaint.evaWorst??0) + '" oninput="this.nextElementSibling.value=this.value"><output>' + (complaint.evaWorst??0) + '</output></div></div>' +
+        '<div><span class="rf-scale-label">Dia seguinte</span><div class="rf-scale"><input id="ri-eva-next" type="range" min="0" max="10" value="' + (complaint.evaNextDay??0) + '" oninput="this.nextElementSibling.value=this.value"><output>' + (complaint.evaNextDay??0) + '</output></div></div>' +
+      '</div>' +
+      '<div class="rf-row-grid" style="margin-top:12px;">' +
+        '<div class="rf-field"><label>O que piora</label><input id="ri-c-worsens" type="text" value="' + escapeHtml(complaint.worsens||'') + '"></div>' +
+        '<div class="rf-field"><label>O que alivia</label><input id="ri-c-relieves" type="text" value="' + escapeHtml(complaint.relieves||'') + '"></div>' +
+      '</div>' +
+    '</div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">02</span><h4>Rastreio de risco</h4></div>' +
+      '<div id="ri-flagbar" class="rf-flagbar"><span class="rf-dot"></span><span id="ri-flagtext">Nenhum sinal de alerta marcado.</span></div>' +
+      '<div class="rf-card"><div class="rf-check-grid">' + rfCheckGrid(cfg.riskFlags, riskFlags, 'rf-flag-i') + '</div></div>' +
+    '</div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">03</span><h4>Hist\u00f3rico espec\u00edfico</h4></div><div class="rf-card">' +
+      '<div class="rf-row-grid">' +
+        '<div class="rf-field"><label>Les\u00f5es pr\u00e9vias na regi\u00e3o atual</label><input id="ri-hist-prior" type="text" value="' + escapeHtml(history.priorInjuries||'') + '"></div>' +
+        '<div class="rf-field"><label>Cirurgias</label><input id="ri-hist-surgery" type="text" value="' + escapeHtml(history.surgeries||'') + '"></div>' +
+      '</div>' +
+      '<div class="rf-check-grid" style="margin-top:12px;">' + rfCheckGrid(cfg.historyOptions, historyChanges, 'rf-hist-i') + '</div>' +
+    '</div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">04</span><h4>Mobilidade</h4></div><div class="rf-card"><div class="rf-tablewrap"><table><thead><tr><th>Regi\u00e3o</th><th>Teste</th><th>Direito</th><th>Esquerdo</th><th>Observa\u00e7\u00e3o</th></tr></thead><tbody id="ri-mob-rows">' + mobilityRowsHtml + '</tbody></table></div></div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">05</span><h4>For\u00e7a isom\u00e9trica</h4></div><div class="rf-card"><div class="rf-tablewrap"><table><thead><tr><th>Movimento</th><th>Direito</th><th>Esquerdo</th><th>LSI</th></tr></thead><tbody id="ri-str-rows">' + strengthRowsHtml + '</tbody></table></div><p class="rf-hint">Sem dinam\u00f4metro, use MMT (0\u20135) nos dois lados.</p></div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">06</span><h4>Estabilidade</h4></div><div class="rf-card"><div class="rf-tablewrap"><table><thead><tr><th>Regi\u00e3o</th><th>Teste</th><th>Direito</th><th>Esquerdo</th><th>Observa\u00e7\u00e3o</th></tr></thead><tbody id="ri-stab-rows">' + stabilityRowsHtml + '</tbody></table></div></div></div>';
+
+  var staticBalanceBlockHtml = cfg.staticBalanceTest ? (
+    '<div class="rf-tablewrap"><table><thead><tr><th>Teste</th><th>Direito</th><th>Esquerdo</th><th>LSI</th></tr></thead><tbody id="ri-static-rows">' + staticBalanceRowHtml + '</tbody></table></div>'
+  ) : '';
+  var ybDirRowsHtml = cfg.balanceDirs.map(function(dir, i){
+    var v = balanceDirs[i] || {};
+    return '<tr><td>' + escapeHtml(dir) + '</td><td><input type="number" class="ri-yb-d" data-i="' + i + '" min="0" value="' + (v.d??'') + '"></td><td><input type="number" class="ri-yb-e" data-i="' + i + '" min="0" value="' + (v.e??'') + '"></td></tr>';
+  }).join('');
+  var powerBiPh = (cfg.powerBilateral && cfg.powerBilateral.methodPh) || '';
+
+  inicialHtml +=
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">07</span><h4>Estabilidade din\u00e2mica / Equil\u00edbrio</h4></div><div class="rf-card">' +
+      staticBalanceBlockHtml +
+      '<p class="rf-subhead" style="margin-top:' + (cfg.staticBalanceTest?'16px':'0') + ';">Y-Balance</p>' +
+      '<div class="rf-row-grid">' +
+        '<div class="rf-field"><label>Comprimento do membro D (cm)</label><input id="ri-yb-len-d" type="number" min="0" value="' + (balance.lenD??'') + '"></div>' +
+        '<div class="rf-field"><label>Comprimento do membro E (cm)</label><input id="ri-yb-len-e" type="number" min="0" value="' + (balance.lenE??'') + '"></div>' +
+      '</div>' +
+      '<div class="rf-tablewrap" style="margin-top:12px;"><table><thead><tr><th>Dire\u00e7\u00e3o de alcance</th><th>Direito (cm)</th><th>Esquerdo (cm)</th></tr></thead><tbody id="ri-yb-rows">' + ybDirRowsHtml + '</tbody></table></div>' +
+      '<div class="rf-output-row">' +
+        '<span class="rf-output-pill" id="ri-yb-comp-d">Composto D: <b>\u2014</b></span>' +
+        '<span class="rf-output-pill" id="ri-yb-comp-e">Composto E: <b>\u2014</b></span>' +
+        '<span class="rf-output-pill" id="ri-yb-asym">' + escapeHtml(cfg.balanceAsymLabel) + ': <b>\u2014</b></span>' +
+      '</div>' +
+    '</div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">08</span><h4>Pot\u00eancia</h4></div><div class="rf-card">' +
+      '<div class="rf-tablewrap"><table><thead><tr><th>Teste</th><th>Direito</th><th>Esquerdo</th><th>LSI</th></tr></thead><tbody id="ri-pow-rows">' + powerRowsHtml + '</tbody></table></div>' +
+      '<p class="rf-hint">LSI \u2265 90% ok \u00b7 80\u201389% cautela \u00b7 &lt;80% n\u00e3o progride carga assim\u00e9trica.</p>' +
+      '<p class="rf-subhead" style="margin-top:14px;">' + escapeHtml((cfg.powerBilateral&&cfg.powerBilateral.label)||'') + '</p>' +
+      '<div class="rf-row-grid">' +
+        '<div class="rf-field"><label>Valor (' + escapeHtml((cfg.powerBilateral&&cfg.powerBilateral.unit)||'') + ')</label><input id="ri-pow-bi-value" type="number" min="0" value="' + (powerBilateral.value??'') + '"></div>' +
+        '<div class="rf-field"><label>M\u00e9todo</label><input id="ri-pow-bi-method" type="text" placeholder="' + escapeHtml(powerBiPh) + '" value="' + escapeHtml(powerBilateral.method||'') + '"></div>' +
+      '</div>' +
+    '</div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">09</span><h4>Classifica\u00e7\u00e3o e conduta</h4></div><div class="rf-card">' +
+      '<p class="rf-subhead">Sem\u00e1foro de risco</p>' +
+      '<div class="rf-semaphore">' +
+        '<label class="rf-semopt green"><input type="radio" name="ri-sem" value="verde" ' + (semaphore==='verde'?'checked':'') + '/><span><b>Verde</b>Segue para o plano.</span></label>' +
+        '<label class="rf-semopt amber"><input type="radio" name="ri-sem" value="amarelo" ' + (semaphore==='amarelo'?'checked':'') + '/><span><b>Amarelo</b>Ajusta volume.</span></label>' +
+        '<label class="rf-semopt red"><input type="radio" name="ri-sem" value="vermelho" ' + (semaphore==='vermelho'?'checked':'') + '/><span><b>Vermelho</b>Pausa progress\u00e3o.</span></label>' +
+      '</div>' +
+      '<p id="ri-suggestion" class="rf-suggestion">Sugest\u00e3o autom\u00e1tica: <b>\u2014</b></p>' +
+      '<p class="rf-subhead">Objetivo funcional (curto prazo)</p>' +
+      '<textarea id="ri-goal" placeholder="' + escapeHtml(cfg.objectivePlaceholder||'') + '">' + escapeHtml(functionalGoal) + '</textarea>' +
+      '<p class="rf-subhead">Conduta</p>' +
+      '<div class="rf-check-grid">' +
+        '<label class="rf-opt"><input type="checkbox" class="rf-conduct-i" value="Iniciar Fase 1 do plano de fortalecimento" ' + (conduct.indexOf('Iniciar Fase 1 do plano de fortalecimento')>-1?'checked':'') + '/><span>Iniciar Fase 1 do plano de fortalecimento</span></label>' +
+        '<label class="rf-opt"><input type="checkbox" class="rf-conduct-i" value="Ajustar plano j\u00e1 em andamento" ' + (conduct.indexOf('Ajustar plano j\u00e1 em andamento')>-1?'checked':'') + '/><span>Ajustar plano j\u00e1 em andamento</span></label>' +
+        '<label class="rf-opt"><input type="checkbox" class="rf-conduct-i" value="Encaminhar para avalia\u00e7\u00e3o complementar" ' + (conduct.indexOf('Encaminhar para avalia\u00e7\u00e3o complementar')>-1?'checked':'') + '/><span>Encaminhar para avalia\u00e7\u00e3o complementar</span></label>' +
+      '</div>' +
+      '<div class="rf-row-grid" style="margin-top:12px;"><div class="rf-field"><label>Pr\u00f3xima reavalia\u00e7\u00e3o</label><input id="ri-next-review" type="date" value="' + (nextReview||'') + '"></div></div>' +
+    '</div></div>';
+
+  var reavDate = (existing && existing.date) || todayISO();
+  var initialDateVal = reav.initialDate || (priorInitial && priorInitial.date) || (prevSource && prevSource.date) || '';
+  var prevBiVal = (prevPowerBilateral.value==null||prevPowerBilateral.value==='') ? '\u2014' : prevPowerBilateral.value;
+
+  var reavHtml = '' +
+    '<div class="rf-idbar">' +
+      '<div class="rf-field"><label>Data desta reavalia\u00e7\u00e3o</label><input id="rr-date" type="date" value="' + reavDate + '"></div>' +
+      '<div class="rf-field"><label>Data da avalia\u00e7\u00e3o inicial</label><input id="rr-initial-date" type="date" value="' + initialDateVal + '"></div>' +
+      '<div class="rf-field"><label>Sess\u00e3o n\u00ba</label><input id="rr-session" type="text" value="' + escapeHtml(reav.session||'') + '"></div>' +
+      '<div class="rf-field"><label>Fase atual do plano</label><input id="rr-phase" type="text" placeholder="ex.: Fase 2B" value="' + escapeHtml(reav.phase||'') + '"></div>' +
+      '<div class="rf-field"><label>Avaliador(a)</label><input id="rr-evaluator" type="text" value="' + escapeHtml(reav.evaluator||'') + '"></div>' +
+    '</div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">R1</span><h4>Check-in de status</h4></div><div class="rf-card">' +
+      '<p class="rf-subhead">Escala de dor (EVA 0\u201310) desde a \u00faltima visita</p>' +
+      '<div class="rf-row-grid">' +
+        '<div><span class="rf-scale-label">Agora</span><div class="rf-scale"><input id="rr-eva-now" type="range" min="0" max="10" value="' + (reav.evaNow??0) + '" oninput="this.nextElementSibling.value=this.value"><output>' + (reav.evaNow??0) + '</output></div></div>' +
+        '<div><span class="rf-scale-label">Pior momento</span><div class="rf-scale"><input id="rr-eva-worst" type="range" min="0" max="10" value="' + (reav.evaWorst??0) + '" oninput="this.nextElementSibling.value=this.value"><output>' + (reav.evaWorst??0) + '</output></div></div>' +
+        '<div><span class="rf-scale-label">Dia seguinte</span><div class="rf-scale"><input id="rr-eva-next" type="range" min="0" max="10" value="' + (reav.evaNextDay??0) + '" oninput="this.nextElementSibling.value=this.value"><output>' + (reav.evaNextDay??0) + '</output></div></div>' +
+      '</div>' +
+      '<p class="rf-subhead">Mudou algo na queixa desde a \u00faltima visita?</p>' +
+      '<textarea id="rr-changes">' + escapeHtml(reav.changes||'') + '</textarea>' +
+    '</div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">R2</span><h4>Rastreio r\u00e1pido de risco</h4></div>' +
+      '<div id="rr-flagbar" class="rf-flagbar"><span class="rf-dot"></span><span id="rr-flagtext">Nenhum sinal de alerta marcado.</span></div>' +
+      '<div class="rf-card"><div class="rf-check-grid">' + rfCheckGrid(cfg.riskFlagsReav, reavFlags, 'rf-flag-r') + '</div></div>' +
+    '</div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">R3</span><h4>O que mudou desde a \u00faltima vez</h4></div><div class="rf-card">' +
+      '<div class="rf-check-grid">' + rfCheckGrid(cfg.whatChangedOptions, reavChanged, 'rf-changed-r') + '</div>' +
+    '</div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">R4</span><h4>Pot\u00eancia \u2014 compara\u00e7\u00e3o</h4></div><div class="rf-card">' +
+      '<div class="rf-tablewrap"><table class="rf-compare"><thead><tr><th rowspan="2">Teste</th><th class="rf-grp" colspan="2">Anterior</th><th class="rf-grp" colspan="2">Atual</th><th rowspan="2">LSI</th><th rowspan="2">Evolu\u00e7\u00e3o</th></tr><tr><th>D</th><th>E</th><th>D</th><th>E</th></tr></thead><tbody id="rr-pow-rows">' + powerCompareRowsHtml + '</tbody></table></div>' +
+      '<p class="rf-hint">Valores anteriores puxados automaticamente do \u00faltimo registro salvo.</p>' +
+      '<p class="rf-subhead" style="margin-top:12px;">' + escapeHtml((cfg.powerBilateral&&cfg.powerBilateral.label)||'') + '</p>' +
+      '<div class="rf-row-grid">' +
+        '<div class="rf-field"><label>Valor anterior</label><input type="text" value="' + prevBiVal + '" disabled></div>' +
+        '<div class="rf-field"><label>Valor atual</label><input id="rr-pow-bi-cur" type="number" min="0" value="' + (reav.powerBilateralCur??'') + '"></div>' +
+      '</div>' +
+      '<div class="rf-output-row"><span class="rf-output-pill" id="rr-pow-bi-evo">Evolu\u00e7\u00e3o: <b>\u2014</b></span></div>' +
+    '</div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">R5</span><h4>For\u00e7a isom\u00e9trica \u2014 compara\u00e7\u00e3o</h4></div><div class="rf-card">' +
+      '<div class="rf-tablewrap"><table class="rf-compare"><thead><tr><th rowspan="2">Movimento</th><th class="rf-grp" colspan="2">Anterior</th><th class="rf-grp" colspan="2">Atual</th><th rowspan="2">LSI</th><th rowspan="2">Evolu\u00e7\u00e3o</th></tr><tr><th>D</th><th>E</th><th>D</th><th>E</th></tr></thead><tbody id="rr-str-rows">' + strengthCompareRowsHtml + '</tbody></table></div>' +
+    '</div></div>' +
+    '<div class="rf-block"><div class="rf-block-head"><span class="rf-block-num">R6</span><h4>Classifica\u00e7\u00e3o e conduta</h4></div><div class="rf-card">' +
+      '<p class="rf-subhead">Sem\u00e1foro de risco</p>' +
+      '<div class="rf-semaphore">' +
+        '<label class="rf-semopt green"><input type="radio" name="rr-sem" value="verde" ' + ((reav.semaphore||semaphore)==='verde'?'checked':'') + '/><span><b>Verde</b>Progride.</span></label>' +
+        '<label class="rf-semopt amber"><input type="radio" name="rr-sem" value="amarelo" ' + ((reav.semaphore||semaphore)==='amarelo'?'checked':'') + '/><span><b>Amarelo</b>Mant\u00e9m carga.</span></label>' +
+        '<label class="rf-semopt red"><input type="radio" name="rr-sem" value="vermelho" ' + ((reav.semaphore||semaphore)==='vermelho'?'checked':'') + '/><span><b>Vermelho</b>Recua carga.</span></label>' +
+      '</div>' +
+      '<p id="rr-suggestion" class="rf-suggestion">Sugest\u00e3o autom\u00e1tica: <b>\u2014</b></p>' +
+      '<p class="rf-subhead">Conduta</p>' +
+      '<div class="rf-check-grid">' +
+        '<label class="rf-opt"><input type="checkbox" class="rf-conduct-r" value="Progride para a pr\u00f3xima fase" ' + ((reav.conduct||[]).indexOf('Progride para a pr\u00f3xima fase')>-1?'checked':'') + '/><span>Progride para a pr\u00f3xima fase</span></label>' +
+        '<label class="rf-opt"><input type="checkbox" class="rf-conduct-r" value="Mant\u00e9m fase atual" ' + ((reav.conduct||[]).indexOf('Mant\u00e9m fase atual')>-1?'checked':'') + '/><span>Mant\u00e9m fase atual</span></label>' +
+        '<label class="rf-opt"><input type="checkbox" class="rf-conduct-r" value="Recua uma etapa" ' + ((reav.conduct||[]).indexOf('Recua uma etapa')>-1?'checked':'') + '/><span>Recua uma etapa</span></label>' +
+        '<label class="rf-opt"><input type="checkbox" class="rf-conduct-r" value="Encaminha para avalia\u00e7\u00e3o complementar" ' + ((reav.conduct||[]).indexOf('Encaminha para avalia\u00e7\u00e3o complementar')>-1?'checked':'') + '/><span>Encaminha para avalia\u00e7\u00e3o complementar</span></label>' +
+      '</div>' +
+      '<p class="rf-subhead">Ajuste feito no plano</p>' +
+      '<textarea id="rr-adjust">' + escapeHtml(reav.adjustment||'') + '</textarea>' +
+      '<div class="rf-row-grid" style="margin-top:12px;"><div class="rf-field"><label>Pr\u00f3xima reavalia\u00e7\u00e3o</label><input id="rr-next-review" type="date" value="' + (nextReview||'') + '"></div></div>' +
+    '</div></div>';
+
+  var photosInit = (existing && existing.photos) || [];
+
+  openModal(
+    '<div class="modal-head"><h3>' + (isEdit?'Editar':'Nova') + ' avalia\u00e7\u00e3o \u2014 ' + escapeHtml(cfg.label) + ' \u2014 ' + escapeHtml(client.name) + '</h3><button class="btn btn-ghost icon-btn" data-close-modal>' + icon('close') + '</button></div>' +
+    '<div class="modal-body"><div class="rf-modal">' +
+      '<div class="rf-tabs">' +
+        '<button type="button" class="rf-tab-btn ' + (activeStage==='inicial'?'active':'') + '" data-rf-tab="inicial">Avalia\u00e7\u00e3o inicial</button>' +
+        '<button type="button" class="rf-tab-btn ' + (activeStage==='reav'?'active':'') + '" data-rf-tab="reav">Reavalia\u00e7\u00e3o</button>' +
+      '</div>' +
+      '<div id="rf-tab-inicial" ' + (activeStage!=='inicial'?'hidden':'') + '>' +
+        '<div class="rf-field" style="max-width:220px;margin:0 2px 16px;"><label>Data da avalia\u00e7\u00e3o</label><input id="ri-date" type="date" value="' + ((existing&&existing.stage!=='reav'&&existing.date)||todayISO()) + '"></div>' +
+        inicialHtml +
+      '</div>' +
+      '<div id="rf-tab-reav" ' + (activeStage!=='reav'?'hidden':'') + '>' +
+        reavHtml +
+      '</div>' +
+      photoSectionHtml(photosInit) +
+    '</div></div>' +
+    '<div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn btn-primary" id="f-save">' + icon('check') + 'Salvar</button></div>'
+  , function(root){
+    var currentTab = activeStage;
+    root.querySelectorAll('[data-rf-tab]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var tabName = btn.dataset.rfTab;
+        currentTab = tabName;
+        root.querySelectorAll('[data-rf-tab]').forEach(function(b){ b.classList.toggle('active', b.dataset.rfTab===tabName); });
+        root.querySelector('#rf-tab-inicial').hidden = tabName!=='inicial';
+        root.querySelector('#rf-tab-reav').hidden = tabName!=='reav';
+      });
+    });
+
+    var updFlagI = rfWireFlagGroup(root, '.rf-flag-i', 'ri-flagbar', 'ri-flagtext', 'Nenhum sinal de alerta marcado \u2014 pode seguir com o exame.', ' \u2014 considere reavalia\u00e7\u00e3o/encaminhamento antes de progredir carga.');
+    var updFlagR = rfWireFlagGroup(root, '.rf-flag-r', 'rr-flagbar', 'rr-flagtext', 'Nenhum sinal de alerta marcado \u2014 pode seguir com a reavalia\u00e7\u00e3o.', ' \u2014 pare a progress\u00e3o de carga e reavalie antes de continuar.');
+
+    function updSuggestion(count, id){
+      var out = root.querySelector('#'+id).querySelector('b');
+      out.textContent = count>0 ? 'Vermelho (sinais de alerta presentes)' : 'sem sinais de alerta \u2014 decida entre Verde/Amarelo pelo exame f\u00edsico e funcional';
+    }
+    root.querySelectorAll('.rf-flag-i').forEach(function(f){ f.addEventListener('change', function(){
+      var count = updFlagI();
+      updSuggestion(count, 'ri-suggestion');
+      if(count>0){ var r = root.querySelector('input[name="ri-sem"][value="vermelho"]'); if(r) r.checked = true; }
+    }); });
+    root.querySelectorAll('.rf-flag-r').forEach(function(f){ f.addEventListener('change', function(){
+      var count = updFlagR();
+      updSuggestion(count, 'rr-suggestion');
+      if(count>0){ var r = root.querySelector('input[name="rr-sem"][value="vermelho"]'); if(r) r.checked = true; }
+    }); });
+    updSuggestion([].filter.call(root.querySelectorAll('.rf-flag-i'), function(f){return f.checked;}).length, 'ri-suggestion');
+    updSuggestion([].filter.call(root.querySelectorAll('.rf-flag-r'), function(f){return f.checked;}).length, 'rr-suggestion');
+
+    rfWireLsiTable(root, '#ri-str-rows tr[data-lsi]');
+    rfWireLsiTable(root, '#ri-pow-rows tr[data-lsi]');
+    if(cfg.staticBalanceTest) rfWireLsiTable(root, '#ri-static-rows tr[data-lsi]');
+    rfWireCompareTable(root, '#rr-pow-rows tr[data-lsi-reav]');
+    rfWireCompareTable(root, '#rr-str-rows tr[data-lsi-reav]');
+
+    (function(){
+      var lenD = root.querySelector('#ri-yb-len-d'), lenE = root.querySelector('#ri-yb-len-e');
+      var dirDs = root.querySelectorAll('.ri-yb-d'), dirEs = root.querySelectorAll('.ri-yb-e');
+      var compD = root.querySelector('#ri-yb-comp-d'), compE = root.querySelector('#ri-yb-comp-e'), asym = root.querySelector('#ri-yb-asym');
+      function pill(el, label, text, cls){ el.innerHTML = label + ': <b>' + text + '</b>'; el.className = 'rf-output-pill' + (cls?' '+cls:''); }
+      function calc(){
+        var dVals = [].map.call(dirDs, function(i){ return parseFloat(i.value); });
+        var eVals = [].map.call(dirEs, function(i){ return parseFloat(i.value); });
+        var lD = parseFloat(lenD.value), lE = parseFloat(lenE.value);
+        if(!isNaN(lD) && lD>0 && dVals.every(function(v){return !isNaN(v);})){
+          var sD = Math.round((dVals.reduce(function(a,b){return a+b;},0) / (3*lD)) * 100);
+          pill(compD, 'Composto D', sD + '%');
+        } else { pill(compD, 'Composto D', '\u2014'); }
+        if(!isNaN(lE) && lE>0 && eVals.every(function(v){return !isNaN(v);})){
+          var sE = Math.round((eVals.reduce(function(a,b){return a+b;},0) / (3*lE)) * 100);
+          pill(compE, 'Composto E', sE + '%');
+        } else { pill(compE, 'Composto E', '\u2014'); }
+        if(!isNaN(dVals[0]) && !isNaN(eVals[0])){
+          var diffCm = Math.abs(dVals[0] - eVals[0]);
+          pill(asym, cfg.balanceAsymLabel, diffCm.toFixed(1) + ' cm', diffCm>=4?'bad':'good');
+        } else { pill(asym, cfg.balanceAsymLabel, '\u2014'); }
+      }
+      [lenD, lenE].concat([].slice.call(dirDs), [].slice.call(dirEs)).forEach(function(el){ el.addEventListener('input', calc); });
+      calc();
+    })();
+
+    (function(){
+      var cur = root.querySelector('#rr-pow-bi-cur'), out = root.querySelector('#rr-pow-bi-evo');
+      var pv = parseFloat(prevPowerBilateral.value);
+      function calc(){
+        var cv = parseFloat(cur.value);
+        if(isNaN(pv) || isNaN(cv) || pv===0){ out.innerHTML = 'Evolu\u00e7\u00e3o: <b>\u2014</b>'; out.className='rf-output-pill'; return; }
+        var diff = (cv-pv)/pv, pct = Math.round(diff*100);
+        var label = pct>0 ? ('+'+pct+'%') : (pct+'%');
+        out.innerHTML = 'Evolu\u00e7\u00e3o: <b>' + label + '</b>';
+        out.className = 'rf-output-pill ' + (diff>0.05?'good':diff<-0.05?'bad':'warn');
+      }
+      cur.addEventListener('input', calc); calc();
+    })();
+
+    var photosState = photosInit.slice();
+    wirePhotoSection(root, photosState);
+
+    root.querySelector('#f-save').addEventListener('click', async function(){
+      var stage = currentTab;
+      var date, payload;
+      if(stage === 'inicial'){
+        date = root.querySelector('#ri-date').value || todayISO();
+        var ctxObj = {
+          goal: root.querySelector('#ri-ctx-goal').value.trim(),
+          frequency: root.querySelector('#ri-ctx-freq').value.trim(),
+          volume: root.querySelector('#ri-ctx-volume').value.trim(),
+          injuryHistory: root.querySelector('#ri-ctx-injuries').value.trim(),
+          currentPain: root.querySelector('#ri-ctx-pain').value.trim(),
+          workRoutine: root.querySelector('#ri-ctx-work').value.trim(),
+          sleep: root.querySelector('#ri-ctx-sleep').value.trim(),
+          difficulties: root.querySelector('#ri-ctx-difficulties').value.trim(),
+          improve: root.querySelector('#ri-ctx-improve').value.trim()
+        };
+        var locsSel = [].map.call(root.querySelectorAll('.rf-loc-i:checked'), function(i){return i.value;});
+        var flagsSel = [].map.call(root.querySelectorAll('.rf-flag-i:checked'), function(i){return i.value;});
+        var complaintObj = {
+          locations: locsSel,
+          side: root.querySelector('#ri-c-side').value,
+          onsetType: root.querySelector('#ri-c-onset').value,
+          duration: root.querySelector('#ri-c-duration').value.trim(),
+          worseDuring: root.querySelector('#ri-c-worse-during').checked,
+          worseAfter: root.querySelector('#ri-c-worse-after').checked,
+          evaNow: Number(root.querySelector('#ri-eva-now').value),
+          evaWorst: Number(root.querySelector('#ri-eva-worst').value),
+          evaNextDay: Number(root.querySelector('#ri-eva-next').value),
+          worsens: root.querySelector('#ri-c-worsens').value.trim(),
+          relieves: root.querySelector('#ri-c-relieves').value.trim()
+        };
+        var historyObj = {
+          priorInjuries: root.querySelector('#ri-hist-prior').value.trim(),
+          surgeries: root.querySelector('#ri-hist-surgery').value.trim(),
+          changes: [].map.call(root.querySelectorAll('.rf-hist-i:checked'), function(i){return i.value;})
+        };
+        var mobRows = root.querySelectorAll('#ri-mob-rows tr');
+        var mobilityArr = cfg.mobilityTests.map(function(item, i){
+          var row = mobRows[i];
+          return { test: item.test, region: item.region, d: row.querySelector('.rf-mob-d').value.trim(), e: row.querySelector('.rf-mob-e').value.trim(), obs: row.querySelector('.rf-mob-o').value.trim() };
+        });
+        var testResultsObj = {};
+        var measurements = [];
+        [].forEach.call(root.querySelectorAll('#ri-str-rows tr[data-lsi]'), function(row, i){
+          var item = cfg.strengthTests[i];
+          var dVal = row.querySelector('.val-d').value, eVal = row.querySelector('.val-e').value;
+          if(dVal!=='' || eVal!==''){
+            testResultsObj[item.name] = { d: dVal===''?null:Number(dVal), e: eVal===''?null:Number(eVal) };
+            if(dVal!=='') measurements.push({bodyPart:item.name, side:'D', parameter:'For\u00e7a', value:Number(dVal), unit:item.unit});
+            if(eVal!=='') measurements.push({bodyPart:item.name, side:'E', parameter:'For\u00e7a', value:Number(eVal), unit:item.unit});
+          }
+        });
+        var stabRows = root.querySelectorAll('#ri-stab-rows tr');
+        var stabilityArr = cfg.stabilityTests.map(function(item, i){
+          var row = stabRows[i];
+          if(item.bilateral){ return { test:item.test, region:item.region, b: row.querySelector('.rf-st-b').value.trim(), obs: row.querySelector('.rf-st-o').value.trim() }; }
+          return { test:item.test, region:item.region, d: row.querySelector('.rf-st-d').value.trim(), e: row.querySelector('.rf-st-e').value.trim(), obs: row.querySelector('.rf-st-o').value.trim() };
+        });
+        var balanceObj = {
+          lenD: root.querySelector('#ri-yb-len-d').value===''?null:Number(root.querySelector('#ri-yb-len-d').value),
+          lenE: root.querySelector('#ri-yb-len-e').value===''?null:Number(root.querySelector('#ri-yb-len-e').value),
+          dirs: cfg.balanceDirs.map(function(dir, i){
+            var dIn = root.querySelector('.ri-yb-d[data-i="'+i+'"]'), eIn = root.querySelector('.ri-yb-e[data-i="'+i+'"]');
+            return { d: dIn.value===''?null:Number(dIn.value), e: eIn.value===''?null:Number(eIn.value) };
+          })
+        };
+        if(cfg.staticBalanceTest){
+          var sRow = root.querySelector('#ri-static-rows tr[data-lsi]');
+          var sD = sRow.querySelector('.val-d').value, sE = sRow.querySelector('.val-e').value;
+          balanceObj.staticD = sD===''?null:Number(sD);
+          balanceObj.staticE = sE===''?null:Number(sE);
+          balanceObj.staticTest = { d: balanceObj.staticD, e: balanceObj.staticE };
+          if(balanceObj.staticD!=null) measurements.push({bodyPart:cfg.staticBalanceTest.name, side:'D', parameter:'Equil\u00edbrio', value:balanceObj.staticD, unit:cfg.staticBalanceTest.unit});
+          if(balanceObj.staticE!=null) measurements.push({bodyPart:cfg.staticBalanceTest.name, side:'E', parameter:'Equil\u00edbrio', value:balanceObj.staticE, unit:cfg.staticBalanceTest.unit});
+        }
+        var powerResultsObj = {};
+        [].forEach.call(root.querySelectorAll('#ri-pow-rows tr[data-lsi]'), function(row, i){
+          var item = cfg.powerTests[i];
+          var dVal = row.querySelector('.val-d').value, eVal = row.querySelector('.val-e').value;
+          if(dVal!=='' || eVal!==''){
+            powerResultsObj[item.name] = { d: dVal===''?null:Number(dVal), e: eVal===''?null:Number(eVal) };
+            if(dVal!=='') measurements.push({bodyPart:item.name, side:'D', parameter:'Pot\u00eancia', value:Number(dVal), unit:item.unit});
+            if(eVal!=='') measurements.push({bodyPart:item.name, side:'E', parameter:'Pot\u00eancia', value:Number(eVal), unit:item.unit});
+          }
+        });
+        var powerBilateralObj = {
+          value: root.querySelector('#ri-pow-bi-value').value===''?null:Number(root.querySelector('#ri-pow-bi-value').value),
+          method: root.querySelector('#ri-pow-bi-method').value.trim()
+        };
+        var semaphoreVal = (root.querySelector('input[name="ri-sem"]:checked')||{}).value || 'verde';
+        var conductArr = [].map.call(root.querySelectorAll('.rf-conduct-i:checked'), function(i){return i.value;});
+        var nextReviewVal = root.querySelector('#ri-next-review').value;
+        var goalVal = root.querySelector('#ri-goal').value.trim();
+
+        if(locsSel.length===0 && measurements.length===0){ showToast('Preencha ao menos a queixa principal ou um teste'); return; }
+
+        payload = {
+          clientId: client.id, clientName: client.name, date: date, notes: '', measurements: measurements, photos: photosState,
+          fichaType: fichaType, stage: 'inicial',
+          age: root.querySelector('#ri-age').value.trim(),
+          modality: root.querySelector('#ri-modality').value.trim(),
+          eventDate: root.querySelector('#ri-eventdate').value,
+          evaluator: root.querySelector('#ri-evaluator').value.trim(),
+          context: ctxObj, complaint: complaintObj, riskFlags: flagsSel, history: historyObj,
+          mobility: mobilityArr, testResults: testResultsObj, stability: stabilityArr, balance: balanceObj,
+          powerResults: powerResultsObj, powerBilateral: powerBilateralObj,
+          semaphore: semaphoreVal, conduct: conductArr, nextReview: nextReviewVal, functionalGoal: goalVal
+        };
+      } else {
+        date = root.querySelector('#rr-date').value || todayISO();
+        var reavFlagsSel = [].map.call(root.querySelectorAll('.rf-flag-r:checked'), function(i){return i.value;});
+        var reavChangedSel = [].map.call(root.querySelectorAll('.rf-changed-r:checked'), function(i){return i.value;});
+        var measurements2 = [];
+        var strRows = root.querySelectorAll('#rr-str-rows tr[data-lsi-reav]');
+        var strengthCur = {};
+        cfg.strengthTests.forEach(function(item, i){
+          var row = strRows[i];
+          var dVal = row.querySelector('.cur-d').value, eVal = row.querySelector('.cur-e').value;
+          strengthCur[item.name] = { d: dVal===''?null:Number(dVal), e: eVal===''?null:Number(eVal) };
+          if(dVal!=='') measurements2.push({bodyPart:item.name, side:'D', parameter:'For\u00e7a', value:Number(dVal), unit:item.unit});
+          if(eVal!=='') measurements2.push({bodyPart:item.name, side:'E', parameter:'For\u00e7a', value:Number(eVal), unit:item.unit});
+        });
+        var powRows = root.querySelectorAll('#rr-pow-rows tr[data-lsi-reav]');
+        var powerCur = {};
+        cfg.powerTests.forEach(function(item, i){
+          var row = powRows[i];
+          var dVal = row.querySelector('.cur-d').value, eVal = row.querySelector('.cur-e').value;
+          powerCur[item.name] = { d: dVal===''?null:Number(dVal), e: eVal===''?null:Number(eVal) };
+          if(dVal!=='') measurements2.push({bodyPart:item.name, side:'D', parameter:'Pot\u00eancia', value:Number(dVal), unit:item.unit});
+          if(eVal!=='') measurements2.push({bodyPart:item.name, side:'E', parameter:'Pot\u00eancia', value:Number(eVal), unit:item.unit});
+        });
+        var balanceReavObj = {};
+        if(cfg.staticBalanceTest){
+          var stRow = powRows[cfg.powerTests.length];
+          var sD2 = stRow.querySelector('.cur-d').value, sE2 = stRow.querySelector('.cur-e').value;
+          balanceReavObj.staticTest = { d: sD2===''?null:Number(sD2), e: sE2===''?null:Number(sE2) };
+        }
+        var semaphoreReavVal = (root.querySelector('input[name="rr-sem"]:checked')||{}).value || 'verde';
+        var conductReavArr = [].map.call(root.querySelectorAll('.rf-conduct-r:checked'), function(i){return i.value;});
+        var reavObj = {
+          evaNow: Number(root.querySelector('#rr-eva-now').value),
+          evaWorst: Number(root.querySelector('#rr-eva-worst').value),
+          evaNextDay: Number(root.querySelector('#rr-eva-next').value),
+          changes: root.querySelector('#rr-changes').value.trim(),
+          riskFlags: reavFlagsSel, whatChanged: reavChangedSel,
+          session: root.querySelector('#rr-session').value.trim(),
+          phase: root.querySelector('#rr-phase').value.trim(),
+          evaluator: root.querySelector('#rr-evaluator').value.trim(),
+          initialDate: root.querySelector('#rr-initial-date').value,
+          semaphore: semaphoreReavVal, conduct: conductReavArr,
+          adjustment: root.querySelector('#rr-adjust').value.trim(),
+          powerBilateralCur: root.querySelector('#rr-pow-bi-cur').value===''?null:Number(root.querySelector('#rr-pow-bi-cur').value)
+        };
+        var biCurVal = root.querySelector('#rr-pow-bi-cur').value;
+        if(biCurVal!=='') measurements2.push({bodyPart:(cfg.powerBilateral&&cfg.powerBilateral.label)||'Pot\u00eancia bilateral', side:'B', parameter:'Pot\u00eancia', value:Number(biCurVal), unit:(cfg.powerBilateral&&cfg.powerBilateral.unit)||''});
+
+        payload = {
+          clientId: client.id, clientName: client.name, date: date, notes: '', measurements: measurements2, photos: photosState,
+          fichaType: fichaType, stage: 'reav',
+          testResults: strengthCur, powerResults: powerCur, balance: balanceReavObj,
+          semaphore: semaphoreReavVal, nextReview: root.querySelector('#rr-next-review').value,
+          reav: reavObj
+        };
+      }
+      if(isEdit) await Store.update('assessments', existing.id, payload); else await Store.add('assessments', payload);
+      showToast(isEdit?'Avalia\u00e7\u00e3o atualizada':'Avalia\u00e7\u00e3o registrada'); closeModal();
     });
   }, {wide:true});
 }
