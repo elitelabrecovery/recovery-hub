@@ -1389,6 +1389,45 @@ function setSyncPill(mode){
 let currentTeamUser = null;
 let __teamUserUnsub = null;
 
+function showForcePasswordChange(){
+  return new Promise(function(resolve){
+    var overlay = document.createElement('div');
+    overlay.id = 'force-pw-gate';
+    overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg);z-index:700;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = '<div class="pin-card" style="max-width:340px;">'
+      + '<p style="font-weight:700;font-size:15px;margin:0 0 6px;">Defina sua senha</p>'
+      + '<p class="muted" style="margin:0 0 4px;font-size:12.5px;">Por segurança, defina uma nova senha antes de continuar.</p>'
+      + '<input id="fpw-new" type="password" placeholder="Nova senha (mín. 6 caracteres)" style="margin-top:10px;text-align:left;letter-spacing:normal;font-size:14px;"/>'
+      + '<input id="fpw-confirm" type="password" placeholder="Confirmar nova senha" style="margin-top:8px;text-align:left;letter-spacing:normal;font-size:14px;"/>'
+      + '<p class="err" id="fpw-error"></p>'
+      + '<button class="btn btn-primary" id="fpw-submit" type="button" style="width:100%;justify-content:center;margin-top:6px;">Salvar e continuar</button>';
+    document.body.appendChild(overlay);
+    var submit = function(){
+      var p1 = document.getElementById('fpw-new').value;
+      var p2 = document.getElementById('fpw-confirm').value;
+      var err = document.getElementById('fpw-error');
+      err.textContent='';
+      if(!p1 || p1.length<6){ err.textContent='A senha precisa ter pelo menos 6 caracteres.'; return; }
+      if(p1!==p2){ err.textContent='As senhas não conferem.'; return; }
+      var btn = document.getElementById('fpw-submit'); btn.disabled=true;
+      firebaseAuth.currentUser.updatePassword(p1).then(function(){
+        return firebaseDb.collection('team_users').doc(firebaseAuth.currentUser.uid).update({ mustChangePassword:false });
+      }).then(function(){
+        if(currentTeamUser) currentTeamUser.mustChangePassword=false;
+        overlay.remove();
+        resolve();
+      }).catch(function(e){
+        btn.disabled=false;
+        if(e && e.code==='auth/requires-recent-login'){ err.textContent='Sessão expirada — saia e entre novamente para trocar a senha.'; }
+        else{ err.textContent='Não foi possível salvar a nova senha. Tente novamente.'; }
+      });
+    };
+    document.getElementById('fpw-submit').addEventListener('click', submit);
+    document.getElementById('fpw-confirm').addEventListener('keydown', function(e){ if(e.key==='Enter') submit(); });
+    document.getElementById('fpw-new').focus();
+  });
+}
+
 async function loadTeamUserProfile(user){
   if(!firebaseDb || !user) return false;
   try{
@@ -1468,8 +1507,9 @@ async function doLogin(){
       err.textContent = 'Usuário bloqueado ou sem cadastro na equipe. Fale com um administrador.';
       return;
     }
-    renderCurrentUserBox();
     document.getElementById('pin-gate').hidden = true;
+    if(currentTeamUser && currentTeamUser.mustChangePassword){ await showForcePasswordChange(); }
+    renderCurrentUserBox();
     bootApp();
   } finally {
     submitBtn.disabled = false;
@@ -1516,7 +1556,7 @@ async function renderUsers(root, actions){
       + '<td><div class="flex gap8" style="align-items:center;"><span class="avatar">'+escapeHtml(initials(u.name))+'</span><span>'+escapeHtml(u.name||'—')+(isSelf?' <span class="muted" style="font-size:11px;">(você)</span>':'')+'</span></div></td>'
       + '<td>'+escapeHtml(u.email||'—')+'</td>'
       + '<td>'+(u.role==='admin'?'Administrador':'Equipe')+'</td>'
-      + '<td>'+(blocked?'<span class="badge bad">Bloqueado</span>':'<span class="badge good">Ativo</span>')+'</td>'
+      + '<td>'+(blocked?'<span class="badge bad">Bloqueado</span>':(u.mustChangePassword?'<span class="badge warn">Ativo · troca pendente</span>':'<span class="badge good">Ativo</span>'))+'</td>'
       + '<td>'+fmtDateTime(u.lastLoginAt)+'</td>'
       + '<td><div class="row-actions">'
       + '<button class="btn btn-ghost btn-sm" data-reset="'+u.id+'" data-email="'+escapeHtml(u.email||'')+'">Redefinir senha</button>'
@@ -1585,6 +1625,7 @@ function openUserForm(){
             createdAt:new Date().toISOString(),
             createdByUid: currentTeamUser?currentTeamUser.uid:null,
             createdByName: currentTeamUser?currentTeamUser.name:null,
+            mustChangePassword: true,
           });
           try{ await secondaryAuth.signOut(); }catch(e){}
           try{ await secondaryApp.delete(); }catch(e){}
@@ -4604,7 +4645,7 @@ if(!firebaseAuth){
   firebaseAuth.onAuthStateChanged(async user=>{
     if(user){
       const ok = await loadTeamUserProfile(user);
-      if(ok){ renderCurrentUserBox(); gate.hidden=true; bootApp(); }
+      if(ok){ gate.hidden=true; if(currentTeamUser && currentTeamUser.mustChangePassword){ await showForcePasswordChange(); } renderCurrentUserBox(); bootApp(); }
       else {
         try{ await firebaseAuth.signOut(); }catch(e){}
         gate.hidden=false;
