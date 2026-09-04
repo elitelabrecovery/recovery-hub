@@ -3854,7 +3854,10 @@ function openSendAssessmentsEmailModal(client, own){
   var bodyDefault = buildAssessmentsShortMailMessage(client);
   var autoAvailable = !!(window.EMAILJS_CONFIG && window.EMAILJS_CONFIG.publicKey && window.EMAILJS_CONFIG.serviceId && window.EMAILJS_CONFIG.templateId && window.emailjs);
   var slug = (client.name||'cliente').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-  var filename = 'avaliacoes-' + slug + '.pdf';
+  var __now = new Date();
+  var __pad = function(n){ return String(n).padStart(2,'0'); };
+  var __stamp = __now.getFullYear() + __pad(__now.getMonth()+1) + __pad(__now.getDate()) + '-' + __pad(__now.getHours()) + __pad(__now.getMinutes()) + __pad(__now.getSeconds());
+  var filename = 'avaliacoes-' + slug + '-' + __stamp + '.pdf';
   openModal(`
     <div class="modal-head"><h3>Enviar avalia\u00e7\u00f5es por e-mail</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
     <div class="modal-body">
