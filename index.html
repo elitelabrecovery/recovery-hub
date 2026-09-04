@@ -1559,10 +1559,17 @@ async function renderUsers(root, actions){
       + '<td>'+(blocked?'<span class="badge bad">Bloqueado</span>':(u.mustChangePassword?'<span class="badge warn">Ativo · troca pendente</span>':'<span class="badge good">Ativo</span>'))+'</td>'
       + '<td>'+fmtDateTime(u.lastLoginAt)+'</td>'
       + '<td><div class="row-actions">'
+      + '<button class="btn btn-ghost btn-sm" data-edit="'+u.id+'">Editar</button>'
       + '<button class="btn btn-ghost btn-sm" data-reset="'+u.id+'" data-email="'+escapeHtml(u.email||'')+'">Redefinir senha</button>'
       + '<button class="btn '+(blocked?'btn-primary':'btn-ghost')+' btn-sm" data-toggle="'+u.id+'" data-blocked="'+(blocked?'1':'0')+'">'+(blocked?'Desbloquear':'Bloquear')+'</button>'
       + '</div></td></tr>';
   }).join('');
+  tbody.querySelectorAll('[data-edit]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var u = users.find(function(x){ return x.id===btn.dataset.edit; });
+      if(u) openEditUserModal(u);
+    });
+  });
   tbody.querySelectorAll('[data-reset]').forEach(function(btn){
     btn.addEventListener('click', async function(){
       const email = btn.dataset.email;
@@ -1590,6 +1597,54 @@ async function renderUsers(root, actions){
       }catch(e){ showToast('Falha ao atualizar usuário.'); }
     });
   });
+}
+
+function openEditUserModal(u){
+  var isSelf = currentTeamUser && u.id===currentTeamUser.uid;
+  openModal(
+    '<div class="modal-head"><h3>Editar usuário</h3><button class="btn btn-ghost icon-btn" data-close-modal>'+icon('close')+'</button></div>'
+    + '<div class="modal-body">'
+    + '<div class="field"><label>Nome completo</label><input id="eu-name" value="'+escapeHtml(u.name||'')+'"/></div>'
+    + '<div class="field"><label>E-mail</label><input id="eu-email" type="email" value="'+escapeHtml(u.email||'')+'" '+(isSelf?'':'disabled')+'/></div>'
+    + (isSelf
+        ? '<p class="muted" style="font-size:11.5px;margin-top:-6px;">Trocar seu próprio e-mail pode pedir para você entrar de novo.</p>'
+        : '<p class="muted" style="font-size:11.5px;margin-top:-6px;">Só a própria pessoa pode trocar seu e-mail de login (entrando no app). Para trocar por outra pessoa, altere direto no Firebase Console (Authentication → Users) e depois atualize aqui pra manter os dois sincronizados.</p>')
+    + '<div class="field"><label>Papel</label><select id="eu-role"><option value="staff" '+(u.role!=='admin'?'selected':'')+'>Equipe</option><option value="admin" '+(u.role==='admin'?'selected':'')+'>Administrador</option></select></div>'
+    + '<p class="err" id="eu-error"></p>'
+    + '</div>'
+    + '<div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn btn-primary" id="eu-save">Salvar</button></div>',
+    function(modalRoot){
+      modalRoot.querySelector('#eu-save').addEventListener('click', async function(){
+        var name = modalRoot.querySelector('#eu-name').value.trim();
+        var email = modalRoot.querySelector('#eu-email').value.trim().toLowerCase();
+        var role = modalRoot.querySelector('#eu-role').value;
+        var err = modalRoot.querySelector('#eu-error');
+        err.textContent='';
+        if(!name){ err.textContent='Informe o nome.'; return; }
+        var saveBtn = modalRoot.querySelector('#eu-save'); saveBtn.disabled=true;
+        try{
+          var patch = { name: name, role: role };
+          if(isSelf && email && email!==(u.email||'').toLowerCase()){
+            await firebaseAuth.currentUser.updateEmail(email);
+            patch.email = email;
+          }
+          await firebaseDb.collection('team_users').doc(u.id).update(patch);
+          if(isSelf && currentTeamUser){ currentTeamUser.name = name; currentTeamUser.role = role; if(patch.email) currentTeamUser.email = patch.email; renderCurrentUserBox(); renderNav(); }
+          showToast('Usuário atualizado.');
+          closeModal();
+          renderView();
+        }catch(e){
+          console.warn(e);
+          if(e && e.code==='auth/requires-recent-login'){ err.textContent='Por segurança, saia e entre de novo antes de trocar o e-mail.'; }
+          else if(e && e.code==='auth/email-already-in-use'){ err.textContent='Já existe uma conta com esse e-mail.'; }
+          else if(e && e.code==='auth/invalid-email'){ err.textContent='E-mail inválido.'; }
+          else{ err.textContent='Não foi possível salvar as alterações.'; }
+        } finally {
+          saveBtn.disabled=false;
+        }
+      });
+    }
+  );
 }
 
 function openUserForm(){
