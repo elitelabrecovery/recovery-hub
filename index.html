@@ -1437,7 +1437,7 @@ async function loadTeamUserProfile(user){
     if(!doc.exists){
       const anySnap = await firebaseDb.collection('team_users').limit(1).get();
       if(anySnap.empty){
-        const profile = { name: user.displayName || user.email || 'Administrador', email: (user.email||'').toLowerCase(), role:'admin', blocked:false, failedAttempts:0, createdAt:new Date().toISOString(), createdByName:'sistema (primeiro acesso)' };
+        const profile = { name: user.displayName || user.email || 'Administrador', email: (user.email||'').toLowerCase(), role:'admin', blocked:false, failedAttempts:0, createdAt:new Date().toISOString(), createdByName:'sistema (primeiro acesso)', loginCount:0 };
         await ref.set(profile);
         doc = await ref.get();
       } else {
@@ -1447,7 +1447,7 @@ async function loadTeamUserProfile(user){
     const data = doc.data();
     if(data.blocked) return false;
     currentTeamUser = { uid:user.uid, ...data };
-    ref.update({ failedAttempts:0, lastLoginAt:new Date().toISOString() }).catch(()=>{});
+    ref.update({ failedAttempts:0, lastLoginAt:new Date().toISOString(), loginCount: firebase.firestore.FieldValue.increment(1) }).catch(()=>{});
     if(__teamUserUnsub){ __teamUserUnsub(); __teamUserUnsub=null; }
     __teamUserUnsub = ref.onSnapshot(function(s){
       if(s.exists){
@@ -1539,8 +1539,8 @@ async function renderUsers(root, actions){
   actions.querySelector('#btn-new-user').addEventListener('click', openUserForm);
   root.innerHTML = '<div class="card"><div class="card-head"><h3>Equipe com acesso ao app</h3></div>'
     + '<div class="table-wrap"><table><thead><tr>'
-    + '<th>Usuário</th><th>E-mail</th><th>Papel</th><th>Status</th><th>Último acesso</th><th></th>'
-    + '</tr></thead><tbody id="users-tbody"><tr><td colspan="6" class="muted">Carregando…</td></tr></tbody></table></div></div>';
+    + '<th>Usuário</th><th>E-mail</th><th>Papel</th><th>Status</th><th>Último acesso</th><th>Acessos</th><th></th>'
+    + '</tr></thead><tbody id="users-tbody"><tr><td colspan="7" class="muted">Carregando…</td></tr></tbody></table></div></div>';
   let users = [];
   try{
     const snap = await firebaseDb.collection('team_users').get();
@@ -1549,7 +1549,7 @@ async function renderUsers(root, actions){
   }catch(e){ console.warn(e); }
   const tbody = document.getElementById('users-tbody');
   if(!tbody) return;
-  if(users.length===0){ tbody.innerHTML = '<tr><td colspan="6" class="muted">Nenhum usuário cadastrado.</td></tr>'; return; }
+  if(users.length===0){ tbody.innerHTML = '<tr><td colspan="7" class="muted">Nenhum usuário cadastrado.</td></tr>'; return; }
   tbody.innerHTML = users.map(function(u){
     const blocked = !!u.blocked;
     const isSelf = currentTeamUser && u.id===currentTeamUser.uid;
@@ -1559,6 +1559,7 @@ async function renderUsers(root, actions){
       + '<td>'+(u.role==='admin'?'Administrador':'Equipe')+'</td>'
       + '<td>'+(blocked?'<span class="badge bad">Bloqueado</span>':(u.mustChangePassword?'<span class="badge warn">Ativo · troca pendente</span>':'<span class="badge good">Ativo</span>'))+'</td>'
       + '<td>'+fmtDateTime(u.lastLoginAt)+'</td>'
+    + '<td>'+(u.loginCount||0)+'</td>'
       + '<td><div class="row-actions">'
       + '<button class="btn btn-ghost btn-sm" data-edit="'+u.id+'">Editar</button>'
       + '<button class="btn btn-ghost btn-sm" data-reset="'+u.id+'" data-email="'+escapeHtml(u.email||'')+'">Redefinir senha</button>'
