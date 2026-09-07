@@ -1842,24 +1842,6 @@ function renderDashboard(root, actions){
   const isAdminDash = typeof currentTeamUser!=='undefined' && currentTeamUser && currentTeamUser.role==='admin';
 
   root.innerHTML = `
-    ${absentList.length>0 ? (
-    '<div class="card" style="margin-bottom:16px;border:1px solid var(--accent);">' +
-      '<div class="card-head"><h3><span class="icon-inline">'+icon('bell')+'</span> Top '+absentList.length+' clientes de maior frequência ausentes há mais de '+absSettings.days+' dias</h3><span class="badge warn">'+absentList.length+'</span></div>' +
-      '<div class="card-body tight">' +
-        '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th style="text-align:center;">Dias ausente</th><th>Última sessão</th><th>Último serviço</th><th style="text-align:right;">Valor última sessão</th></tr></thead><tbody>' +
-        absentList.map(function(x){
-          var daysAbsent = x.last ? Math.floor((new Date() - new Date(x.last+'T00:00:00'))/86400000) : null;
-          var valueStr = x.lastValue!=null ? fmtMoney(x.lastValue) : '—';
-          return '<tr><td class="cell-strong">'+escapeHtml(x.c.name)+'</td><td class="muted" style="font-size:12px;text-align:center;">'+(daysAbsent!==null?daysAbsent:'—')+'</td><td class="muted" style="font-size:12px;">'+(x.last?fmtDate(x.last):'Sem sessão concluída registrada')+'</td><td class="muted" style="font-size:12px;">'+escapeHtml(x.lastService||'—')+'</td><td class="muted" style="font-size:12px;text-align:right;">'+valueStr+'</td></tr>';
-        }).join('') +
-        '</tbody></table></div>' +
-        '<div style="padding:12px 14px;display:flex;gap:10px;flex-wrap:wrap;">' +
-          '<button class="btn btn-primary" id="btn-send-absence">'+icon('mail')+'<span>Enviar notificação por e-mail</span></button>' +
-          (isAdminDash ? ('<button class="btn" id="btn-abs-settings-2">'+icon('settings')+'<span>Configurar</span></button>') : '') +
-        '</div>' +
-      '</div>' +
-    '</div>'
-    ) : ''}
     <div class="kpi-grid">
       <div class="kpi"><div class="kpi-label">Receita do mês</div><div class="kpi-value tnum">${fmtMoney(revThisMonth)}</div><div class="kpi-delta ${saldo>=0?'up':'down'}">${transactions.filter(t=>t.type==='receita'&&monthKey(t.date)===thisMonth).length} lançamento(s)</div></div>
       <div class="kpi"><div class="kpi-label">Despesas do mês</div><div class="kpi-value tnum">${fmtMoney(expThisMonth)}</div><div class="kpi-delta flat">${transactions.filter(t=>t.type==='despesa'&&monthKey(t.date)===thisMonth).length} lançamento(s)</div></div>
@@ -1890,7 +1872,26 @@ function renderDashboard(root, actions){
         </div>
       </div>
     </div>
-  `;
+  
+    ${absentList.length>0 ? (
+    '<div class="card" style="margin-bottom:16px;border:1px solid var(--accent);">' +
+      '<div class="card-head"><h3><span class="icon-inline">'+icon('bell')+'</span> Top '+absentList.length+' clientes de maior frequência ausentes há mais de '+absSettings.days+' dias</h3><span class="badge warn">'+absentList.length+'</span></div>' +
+      '<div class="card-body tight">' +
+        '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th style="text-align:center;">Dias ausente</th><th>Última sessão</th><th>Último serviço</th><th style="text-align:right;">Valor última sessão</th></tr></thead><tbody>' +
+        absentList.map(function(x){
+          var daysAbsent = x.last ? Math.floor((new Date() - new Date(x.last+'T00:00:00'))/86400000) : null;
+          var valueStr = x.lastValue!=null ? fmtMoney(x.lastValue) : '—';
+          return '<tr><td class="cell-strong">'+escapeHtml(x.c.name)+'</td><td class="muted" style="font-size:12px;text-align:center;">'+(daysAbsent!==null?daysAbsent:'—')+'</td><td class="muted" style="font-size:12px;">'+(x.last?fmtDate(x.last):'Sem sessão concluída registrada')+'</td><td class="muted" style="font-size:12px;">'+escapeHtml(x.lastService||'—')+'</td><td class="muted" style="font-size:12px;text-align:right;">'+valueStr+'</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        '<div style="padding:12px 14px;display:flex;gap:10px;flex-wrap:wrap;">' +
+          '<button class="btn btn-primary" id="btn-send-absence">'+icon('mail')+'<span>Enviar notificação por e-mail</span></button>' +
+          (isAdminDash ? ('<button class="btn" id="btn-abs-settings-2">'+icon('settings')+'<span>Configurar</span></button>') : '') +
+        '</div>' +
+      '</div>' +
+    '</div>'
+    ) : ''}
+    `;
   const absBtn1 = actions && actions.querySelector('#btn-abs-settings');
   if(absBtn1) absBtn1.addEventListener('click', openAbsenceSettingsModal);
   const absBtn2 = root.querySelector('#btn-abs-settings-2');
