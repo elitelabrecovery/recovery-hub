@@ -980,18 +980,22 @@ function exportRankingPdf(title, periodLabel, colLabel, valueLabel, rows, isMone
 /* ---------- NOTIFICAÇÃO DE CLIENTES AUSENTES ---------- */
 function getAbsenceSettings(){
   const s = (Store.data.settings||[]).find(x=>x.id==='absence') || {};
-  return { days: Number(s.days)||30, email: s.email||'' };
+  return { days: Number(s.days)||30, email: s.email||'', topN: Number(s.topN)||30, enabled: s.enabled===true };
 }
-function getAbsentClients(days){
+function getAbsentClients(days, topN){
   const {clients, appointments} = Store.data;
   const cutoff = new Date(); cutoff.setHours(0,0,0,0); cutoff.setDate(cutoff.getDate()-days);
-  return clients.filter(c=>(c.status||'ativo')==='ativo').map(c=>{
+  let list = clients.filter(c=>(c.status||'ativo')==='ativo').map(c=>{
     const done = appointments.filter(a=>a.clientId===c.id && a.status==='concluido' && a.date).sort((x,y)=>y.date.localeCompare(x.date));
     const last = done[0]?.date || null;
-    return {c, last};
-  }).filter(x=> x.last ? new Date(x.last+'T00:00:00') < cutoff : true) // sem sessão concluída também conta como ausente
-    .filter(x=> x.c.createdAt ? new Date((x.c.createdAt||'').slice(0,10)+'T00:00:00') < cutoff : true) // ignora cadastros muito recentes sem histórico
-    .sort((a,b)=> (a.last||'').localeCompare(b.last||''));
+    const lastService = done[0]?.serviceName || null;
+    return {c, last, freq: done.length, lastService};
+  })
+  .filter(x=> x.last ? new Date(x.last+'T00:00:00') < cutoff : true) // sem sessão concluída também conta como ausente
+  .filter(x=> x.c.createdAt ? new Date((x.c.createdAt||'').slice(0,10)+'T00:00:00') < cutoff : true); // ignora cadastros muito recentes sem histórico
+  list.sort((a,b)=> b.freq - a.freq || (a.last||'').localeCompare(b.last||''));
+  if (topN) list = list.slice(0, topN);
+  return list;
 }
 
 const SERVICE_CATEGORIES = ['FISIOTERAPIA','RECOVERY & PERFORMANCE','AVALIAÇÃO','TERAPIA MANUAL','OUTRO'];
@@ -1782,14 +1786,21 @@ function buildAbsenceMailBody(absentList, days){
   return `Clientes sem visita há mais de ${days} dias na Elite Lab Recovery:\n\n${lines.join('\n')}${absentList.length>50?`\n\n(+${absentList.length-50} outro(s) cliente(s))`:''}`;
 }
 function openAbsenceSettingsModal(){
+  const isAdmin = typeof currentTeamUser!=='undefined' && currentTeamUser && currentTeamUser.role==='admin';
+  if(!isAdmin){ showToast('Apenas administradores podem configurar o alerta de ausência.'); return; }
   const s = getAbsenceSettings();
   openModal(`
-    <div class="modal-head"><h3>Notificação de clientes ausentes</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
+    <div class="modal-head"><h3>Alerta de clientes ausentes</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
     <div class="modal-body">
-      <p class="muted" style="font-size:12.5px;margin-top:0;">Configure a partir de quantos dias sem sessão concluída um cliente é considerado ausente, e para qual e-mail enviar o alerta.</p>
+      <p class="muted" style="font-size:12.5px;margin-top:0;">Configure quantos dias sem sessão concluída definem um cliente como ausente, quantos clientes de maior frequência exibir no alerta, e para qual e-mail enviar a notificação.</p>
+      <label style="display:flex;align-items:center;gap:8px;margin:0 0 14px;">
+        <input id="f-abs-enabled" type="checkbox" ${s.enabled ? 'checked' : ''}/>
+        Ativar popup de alerta em todo acesso ao app
+      </label>
       <div class="field-row">
         <div class="field"><label>Dias sem visita</label><input id="f-abs-days" type="number" min="1" value="${s.days}"/></div>
-        <div class="field"><label>E-mail para notificação</label><input id="f-abs-email" type="email" value="${escapeHtml(s.email)}" placeholder="contato@elitelabrecovery.com"/></div>
+        <div class="field"><label>Top N clientes (maior frequência)</label><input id="f-abs-topn" type="number" min="1" value="${s.topN}"/></div>
+        <div class="field"><label>E-mail para notificação</label><input id="f-abs-email" type="email" value="${s.email}" placeholder="ex: elitelabrecovery@gmail.com"/></div>
       </div>
       <p class="muted" style="font-size:11.5px;">Como o app roda direto no navegador, sem servidor próprio, o envio do e-mail é feito manualmente: ao clicar em "Enviar notificação" no painel, seu programa de e-mail abre já com a lista de ausentes preenchida para esse endereço.</p>
     </div>
@@ -1797,15 +1808,17 @@ function openAbsenceSettingsModal(){
   `, root=>{
     root.querySelector('#f-save').addEventListener('click', async ()=>{
       const days = Math.max(1, Number(root.querySelector('#f-abs-days').value)||30);
+      const topN = Math.max(1, Number(root.querySelector('#f-abs-topn').value)||30);
       const email = root.querySelector('#f-abs-email').value.trim();
-      await Store.upsert('settings','absence',{days, email});
-      showToast('Configuração de ausência salva'); closeModal(); renderView();
+      const enabled = root.querySelector('#f-abs-enabled').checked;
+      await Store.upsert('settings','absence',{days, email, topN, enabled});
+      showToast('Configuração de alerta de ausência salva'); closeModal(); renderView();
     });
   });
 }
 
 function renderDashboard(root, actions){
-  if(actions) actions.innerHTML = `<button class="btn" id="btn-abs-settings">${icon('settings')}<span>Notificação de ausentes</span></button>`;
+  if(actions) actions.innerHTML = (typeof currentTeamUser!=='undefined' && currentTeamUser && currentTeamUser.role==='admin') ? `<button class="btn" id="btn-abs-settings">${icon('settings')}<span>Notificação de ausentes</span></button>` : '';
   const {clients,appointments,transactions}=Store.data;
   const today=todayISO();
   const thisMonth=monthKey(today);
@@ -1825,25 +1838,27 @@ function renderDashboard(root, actions){
   const monthLabels = months.map(m=> new Date(m+'-02').toLocaleDateString('pt-BR',{month:'short'}).replace('.','') );
 
   const absSettings = getAbsenceSettings();
-  const absentList = getAbsentClients(absSettings.days);
+  const absentList = getAbsentClients(absSettings.days, absSettings.topN);
+  const isAdminDash = typeof currentTeamUser!=='undefined' && currentTeamUser && currentTeamUser.role==='admin';
 
   root.innerHTML = `
-    ${absentList.length>0 ? `
-    <div class="card" style="margin-bottom:16px;border:1px solid var(--accent);">
-      <div class="card-head"><h3><span class="icon-inline">${icon('bell')}</span> Clientes ausentes há mais de ${absSettings.days} dias</h3><span class="badge warn">${absentList.length}</span></div>
-      <div class="card-body tight">
-        <div class="table-wrap"><table><tbody>${absentList.slice(0,8).map(x=>`
-          <tr>
-            <td class="cell-strong">${escapeHtml(x.c.name)}</td>
-            <td class="muted" style="font-size:12px;">${x.last?`Última sessão: ${fmtDate(x.last)}`:'Sem sessão concluída registrada'}</td>
-          </tr>`).join('')}</tbody></table></div>
-        ${absentList.length>8?`<p class="muted" style="font-size:12px;padding:8px 14px;margin:0;">+${absentList.length-8} outro(s) cliente(s) ausente(s)</p>`:''}
-        <div style="padding:12px 14px;display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-primary" id="btn-send-absence">${icon('mail')}<span>Enviar notificação por e-mail</span></button>
-          <button class="btn" id="btn-abs-settings-2">${icon('settings')}<span>Configurar</span></button>
-        </div>
-      </div>
-    </div>` : ''}
+    ${absentList.length>0 ? (
+    '<div class="card" style="margin-bottom:16px;border:1px solid var(--accent);">' +
+      '<div class="card-head"><h3><span class="icon-inline">'+icon('bell')+'</span> Top '+absentList.length+' clientes de maior frequência ausentes há mais de '+absSettings.days+' dias</h3><span class="badge warn">'+absentList.length+'</span></div>' +
+      '<div class="card-body tight">' +
+        '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th style="text-align:center;">Dias ausente</th><th>Última sessão</th><th>Último serviço</th></tr></thead><tbody>' +
+        absentList.map(function(x){
+          var daysAbsent = x.last ? Math.floor((new Date() - new Date(x.last+'T00:00:00'))/86400000) : null;
+          return '<tr><td class="cell-strong">'+escapeHtml(x.c.name)+'</td><td class="muted" style="font-size:12px;text-align:center;">'+(daysAbsent!==null?daysAbsent:'—')+'</td><td class="muted" style="font-size:12px;">'+(x.last?fmtDate(x.last):'Sem sessão concluída registrada')+'</td><td class="muted" style="font-size:12px;">'+escapeHtml(x.lastService||'—')+'</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        '<div style="padding:12px 14px;display:flex;gap:10px;flex-wrap:wrap;">' +
+          '<button class="btn btn-primary" id="btn-send-absence">'+icon('mail')+'<span>Enviar notificação por e-mail</span></button>' +
+          (isAdminDash ? ('<button class="btn" id="btn-abs-settings-2">'+icon('settings')+'<span>Configurar</span></button>') : '') +
+        '</div>' +
+      '</div>' +
+    '</div>'
+    ) : ''}
     <div class="kpi-grid">
       <div class="kpi"><div class="kpi-label">Receita do mês</div><div class="kpi-value tnum">${fmtMoney(revThisMonth)}</div><div class="kpi-delta ${saldo>=0?'up':'down'}">${transactions.filter(t=>t.type==='receita'&&monthKey(t.date)===thisMonth).length} lançamento(s)</div></div>
       <div class="kpi"><div class="kpi-label">Despesas do mês</div><div class="kpi-value tnum">${fmtMoney(expThisMonth)}</div><div class="kpi-delta flat">${transactions.filter(t=>t.type==='despesa'&&monthKey(t.date)===thisMonth).length} lançamento(s)</div></div>
@@ -4669,9 +4684,40 @@ async function ensureServicesUppercase(){
   }
 }
 
+let __absenceAlertShown = false;
+function showAbsenceAlertPopupOnce(){
+  if(__absenceAlertShown) return;
+  var s = getAbsenceSettings();
+  if(!s.enabled) return;
+  var rows = getAbsentClients(s.days, s.topN);
+  if(!rows.length) return;
+  __absenceAlertShown = true;
+  var rowsHtml = rows.map(function(x){
+    var daysAbsent = x.last ? Math.floor((new Date() - new Date(x.last+'T00:00:00'))/86400000) : '—';
+    return '<tr><td class="cell-strong">'+escapeHtml(x.c.name)+'</td><td style="text-align:center;">'+daysAbsent+'</td><td>'+(x.last?fmtDate(x.last):'—')+'</td><td>'+escapeHtml(x.lastService||'—')+'</td></tr>';
+  }).join('');
+  var overlay = document.createElement('div');
+  overlay.id = 'absenceAlertOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(24,21,18,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+  overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;max-width:680px;width:100%;max-height:82vh;overflow:auto;box-shadow:var(--shadow);border-top:6px solid var(--accent);">' +
+    '<div style="padding:16px 20px;display:flex;align-items:center;gap:10px;background:var(--accent-soft);">' +
+      '<span class="icon-inline">'+icon('bell')+'</span>' +
+      '<div><div style="font-weight:700;color:var(--accent-strong);font-size:16px;">Clientes ausentes há mais de '+s.days+' dias</div>' +
+      '<div style="font-size:13px;color:var(--accent-strong);">Top '+rows.length+' de maior frequência na clínica</div></div>' +
+      '<button id="absenceAlertClose" class="btn btn-ghost icon-btn" style="margin-left:auto;color:var(--accent-strong);">'+icon('close')+'</button>' +
+    '</div>' +
+    '<div class="card-body tight" style="padding:12px 20px 20px;">' +
+      '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th style="text-align:center;">Dias ausente</th><th>Última sessão</th><th>Último serviço</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector('#absenceAlertClose').addEventListener('click', function(){ overlay.remove(); });
+  overlay.addEventListener('click', function(e){ if(e.target===overlay) overlay.remove(); });
+}
+
 function bootApp(){
   renderNav();
-  Store.onChange(()=>{ renderView(); ensureServicesUppercase(); });
+  Store.onChange(()=>{ renderView(); ensureServicesUppercase(); showAbsenceAlertPopupOnce(); });
   Store.init();
   renderView();
   ensureServicesUppercase();
