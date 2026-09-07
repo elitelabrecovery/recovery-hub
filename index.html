@@ -2002,7 +2002,7 @@ function renderClients(root, actions){
     </div>
   `;
   const searchEl = root.querySelector('#client-search');
-  if(searchEl) searchEl.addEventListener('input', e=>{ clientSearch=e.target.value; renderClients(root,actions); searchEl.focus(); searchEl.selectionStart=searchEl.selectionEnd=searchEl.value.length; });
+  if(searchEl) searchEl.addEventListener('input', e=>{ clientSearch=e.target.value; clearTimeout(window.__clientSearchDebounce); window.__clientSearchDebounce=setTimeout(()=>{ renderClients(root,actions); searchEl.focus(); searchEl.selectionStart=searchEl.selectionEnd=searchEl.value.length; }, 150); });
   bindSortHeaders(root, clientSort, ()=>renderClients(root,actions));
   const emptyBtn = root.querySelector('#empty-new-client'); if(emptyBtn) emptyBtn.addEventListener('click', ()=>openClientForm());
   root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openClientForm(clients.find(c=>c.id===b.dataset.edit))));
