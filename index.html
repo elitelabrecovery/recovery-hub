@@ -1994,6 +1994,7 @@ function renderClients(root, actions){
               <td class="tnum cell-strong">${fmtMoney(spent)}</td>
               <td><span class="badge ${CLIENT_STATUS[c.status||'ativo']?.cls}">${CLIENT_STATUS[c.status||'ativo']?.label}</span></td>
               <td><div class="row-actions">
+                <button class="btn btn-ghost icon-btn" data-history="${c.id}" title="Histórico de sessões">${icon('agenda')}</button>
                 <button class="btn btn-ghost icon-btn" data-edit="${c.id}">${icon('edit')}</button>
                 <button class="btn btn-ghost icon-btn btn-danger" data-del="${c.id}">${icon('trash')}</button>
               </div></td>
@@ -2008,6 +2009,7 @@ function renderClients(root, actions){
   bindSortHeaders(root, clientSort, ()=>renderClients(root,actions));
   const emptyBtn = root.querySelector('#empty-new-client'); if(emptyBtn) emptyBtn.addEventListener('click', ()=>openClientForm());
   root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openClientForm(clients.find(c=>c.id===b.dataset.edit))));
+  root.querySelectorAll('[data-history]').forEach(b=>b.addEventListener('click', ()=>openClientSessionsHistory(b.dataset.history)));
   root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
     if(confirm('Remover este cliente? Os agendamentos e lançamentos vinculados não serão apagados.')){ Store.remove('clients', b.dataset.del); showToast('Cliente removido'); }
   }));
@@ -2627,6 +2629,7 @@ function openApptForm(existing){
 
 /* ---------- FINANCE ---------- */
 let financeFilter='all';
+let financeClientSearch='';
 let financeSort={key:'date', dir:'desc'};
 let financeChartFrom=null; // 'YYYY-MM' — null até o primeiro render, quando é preenchido com os últimos 12 meses
 let financeChartTo=null;   // 'YYYY-MM'
@@ -2668,6 +2671,7 @@ function renderFinance(root, actions){
   const {transactions, recurringExpenses}=Store.data;
   let list=[...transactions];
   if(financeFilter!=='all') list = list.filter(t=>t.type===financeFilter);
+  if(financeFilter==='receita' && financeClientSearch.trim()) list = list.filter(t=>(t.clientName||'').toLowerCase().includes(financeClientSearch.trim().toLowerCase()));
   const FINANCE_SORT_VALUE = {
     date: t=> t.date||'',
     description: t=> t.description||'',
@@ -2773,6 +2777,9 @@ function renderFinance(root, actions){
       <button class="tab ${financeFilter==='receita'?'active':''}" data-f="receita">Receitas</button>
       <button class="tab ${financeFilter==='despesa'?'active':''}" data-f="despesa">Despesas</button>
     </div>
+    ${financeFilter==='receita' ? (
+      '<div class="filter-bar" style="margin-top:10px;"><div class="search-input">'+icon('search')+'<input id="finance-client-search" placeholder="Buscar por nome do cliente" value="'+escapeHtml(financeClientSearch)+'"/></div></div>'
+    ) : ''}
     <div class="card" style="margin-top:14px;">
       <div class="card-body tight">
         ${list.length===0? `<div class="empty">${icon('cash')}<p>Nenhum lançamento registrado.</p></div>` :
@@ -2793,6 +2800,8 @@ function renderFinance(root, actions){
     </div>
   `;
   root.querySelectorAll('#fin-tabs .tab').forEach(t=>t.addEventListener('click', ()=>{ financeFilter=t.dataset.f; renderFinance(root,actions); }));
+  const finClientSearchEl = root.querySelector('#finance-client-search');
+  if(finClientSearchEl) finClientSearchEl.addEventListener('input', e=>{ financeClientSearch=e.target.value; clearTimeout(window.__finClientSearchDebounce); window.__finClientSearchDebounce=setTimeout(()=>{ renderFinance(root,actions); const freshEl=root.querySelector('#finance-client-search'); if(freshEl){ freshEl.focus(); freshEl.selectionStart=freshEl.selectionEnd=freshEl.value.length; } }, 150); });
   bindSortHeaders(root, financeSort, ()=>renderFinance(root,actions));
   const chartFromInput = root.querySelector('#fin-chart-from');
   const chartToInput = root.querySelector('#fin-chart-to');
@@ -4716,6 +4725,25 @@ function showAbsenceAlertPopupOnce(){
   document.body.appendChild(overlay);
   overlay.querySelector('#absenceAlertClose').addEventListener('click', function(){ overlay.remove(); });
   overlay.addEventListener('click', function(e){ if(e.target===overlay) overlay.remove(); });
+}
+
+function openClientSessionsHistory(clientId){
+  const {clients, appointments} = Store.data;
+  const client = clients.find(c=>c.id===clientId);
+  if(!client) return;
+  const sessions = appointments.filter(a=>a.clientId===clientId && a.status==='concluido' && a.date).sort((x,y)=>y.date.localeCompare(x.date));
+  const rowsHtml = sessions.map(function(a){
+    var valueStr = a.price!=null ? fmtMoney(Number(a.price)||0) : '—';
+    return '<tr><td class="tnum">'+fmtDate(a.date)+'</td><td>'+escapeHtml(a.serviceName||'—')+'</td><td class="tnum" style="text-align:right;">'+valueStr+'</td></tr>';
+  }).join('');
+  openModal(
+    '<div class="modal-head"><h3>Histórico de sessões — '+escapeHtml(client.name)+'</h3><button class="btn btn-ghost icon-btn" data-close-modal>'+icon('close')+'</button></div>' +
+    '<div class="modal-body">' +
+      (sessions.length ? ('<div class="table-wrap"><table><thead><tr><th>Data</th><th>Serviço</th><th style="text-align:right;">Valor cobrado</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>') : ('<div class="empty">'+icon('search')+'<p>Nenhuma sessão concluída registrada para este cliente.</p></div>')) +
+    '</div>' +
+    '<div class="modal-foot"><button class="btn" data-close-modal>Fechar</button></div>',
+    null, {wide:true}
+  );
 }
 
 function bootApp(){
