@@ -991,8 +991,7 @@ function getAbsentClients(days, topN){
     const lastService = done[0]?.serviceName || null;
     return {c, last, freq: done.length, lastService};
   })
-  .filter(x=> x.last ? new Date(x.last+'T00:00:00') < cutoff : true) // sem sessão concluída também conta como ausente
-  .filter(x=> x.c.createdAt ? new Date((x.c.createdAt||'').slice(0,10)+'T00:00:00') < cutoff : true); // ignora cadastros muito recentes sem histórico
+  .filter(x=> x.last ? new Date(x.last+'T00:00:00') < cutoff : true); // sem sessão concluída também conta como ausente
   list.sort((a,b)=> b.freq - a.freq || (a.last||'').localeCompare(b.last||''));
   if (topN) list = list.slice(0, topN);
   return list;
