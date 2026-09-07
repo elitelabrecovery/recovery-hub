@@ -989,7 +989,8 @@ function getAbsentClients(days, topN){
     const done = appointments.filter(a=>a.clientId===c.id && a.status==='concluido' && a.date).sort((x,y)=>y.date.localeCompare(x.date));
     const last = done[0]?.date || null;
     const lastService = done[0]?.serviceName || null;
-    return {c, last, freq: done.length, lastService};
+    const lastValue = done[0]?.price!=null ? Number(done[0].price)||0 : null;
+    return {c, last, freq: done.length, lastService, lastValue};
   })
   .filter(x=> x.last ? new Date(x.last+'T00:00:00') < cutoff : true); // sem sessão concluída também conta como ausente
   list.sort((a,b)=> b.freq - a.freq || (a.last||'').localeCompare(b.last||''));
@@ -1845,10 +1846,11 @@ function renderDashboard(root, actions){
     '<div class="card" style="margin-bottom:16px;border:1px solid var(--accent);">' +
       '<div class="card-head"><h3><span class="icon-inline">'+icon('bell')+'</span> Top '+absentList.length+' clientes de maior frequência ausentes há mais de '+absSettings.days+' dias</h3><span class="badge warn">'+absentList.length+'</span></div>' +
       '<div class="card-body tight">' +
-        '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th style="text-align:center;">Dias ausente</th><th>Última sessão</th><th>Último serviço</th></tr></thead><tbody>' +
+        '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th style="text-align:center;">Dias ausente</th><th>Última sessão</th><th>Último serviço</th><th style="text-align:right;">Valor última sessão</th></tr></thead><tbody>' +
         absentList.map(function(x){
           var daysAbsent = x.last ? Math.floor((new Date() - new Date(x.last+'T00:00:00'))/86400000) : null;
-          return '<tr><td class="cell-strong">'+escapeHtml(x.c.name)+'</td><td class="muted" style="font-size:12px;text-align:center;">'+(daysAbsent!==null?daysAbsent:'—')+'</td><td class="muted" style="font-size:12px;">'+(x.last?fmtDate(x.last):'Sem sessão concluída registrada')+'</td><td class="muted" style="font-size:12px;">'+escapeHtml(x.lastService||'—')+'</td></tr>';
+          var valueStr = x.lastValue!=null ? fmtMoney(x.lastValue) : '—';
+          return '<tr><td class="cell-strong">'+escapeHtml(x.c.name)+'</td><td class="muted" style="font-size:12px;text-align:center;">'+(daysAbsent!==null?daysAbsent:'—')+'</td><td class="muted" style="font-size:12px;">'+(x.last?fmtDate(x.last):'Sem sessão concluída registrada')+'</td><td class="muted" style="font-size:12px;">'+escapeHtml(x.lastService||'—')+'</td><td class="muted" style="font-size:12px;text-align:right;">'+valueStr+'</td></tr>';
         }).join('') +
         '</tbody></table></div>' +
         '<div style="padding:12px 14px;display:flex;gap:10px;flex-wrap:wrap;">' +
@@ -4693,12 +4695,13 @@ function showAbsenceAlertPopupOnce(){
   __absenceAlertShown = true;
   var rowsHtml = rows.map(function(x){
     var daysAbsent = x.last ? Math.floor((new Date() - new Date(x.last+'T00:00:00'))/86400000) : '—';
-    return '<tr><td class="cell-strong">'+escapeHtml(x.c.name)+'</td><td style="text-align:center;">'+daysAbsent+'</td><td>'+(x.last?fmtDate(x.last):'—')+'</td><td>'+escapeHtml(x.lastService||'—')+'</td></tr>';
+    var valueStr = x.lastValue!=null ? fmtMoney(x.lastValue) : '—';
+    return '<tr><td class="cell-strong">'+escapeHtml(x.c.name)+'</td><td style="text-align:center;">'+daysAbsent+'</td><td>'+(x.last?fmtDate(x.last):'—')+'</td><td>'+escapeHtml(x.lastService||'—')+'</td><td style="text-align:right;">'+valueStr+'</td></tr>';
   }).join('');
   var overlay = document.createElement('div');
   overlay.id = 'absenceAlertOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(24,21,18,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
-  overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;max-width:680px;width:100%;max-height:82vh;overflow:auto;box-shadow:var(--shadow);border-top:6px solid var(--accent);">' +
+  overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;max-width:740px;width:100%;max-height:82vh;overflow:auto;box-shadow:var(--shadow);border-top:6px solid var(--accent);">' +
     '<div style="padding:16px 20px;display:flex;align-items:center;gap:10px;background:var(--accent-soft);">' +
       '<span class="icon-inline">'+icon('bell')+'</span>' +
       '<div><div style="font-weight:700;color:var(--accent-strong);font-size:16px;">Clientes ausentes há mais de '+s.days+' dias</div>' +
@@ -4706,7 +4709,7 @@ function showAbsenceAlertPopupOnce(){
       '<button id="absenceAlertClose" class="btn btn-ghost icon-btn" style="margin-left:auto;color:var(--accent-strong);">'+icon('close')+'</button>' +
     '</div>' +
     '<div class="card-body tight" style="padding:12px 20px 20px;">' +
-      '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th style="text-align:center;">Dias ausente</th><th>Última sessão</th><th>Último serviço</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>' +
+      '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th style="text-align:center;">Dias ausente</th><th>Última sessão</th><th>Último serviço</th><th style="text-align:right;">Valor última sessão</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>' +
     '</div>' +
   '</div>';
   document.body.appendChild(overlay);
