@@ -2987,13 +2987,40 @@ let waSearch = '';
 let waTierFilter = 'all';
 
 function waDigits(phone){ return (phone||'').replace(/\D/g,''); }
-function waLink(phone, text){
-  let digits = waDigits(phone);
-  if(!digits) return null;
-  if(digits.length<=11) digits = '55'+digits; // assume Brasil quando sem código do país
-  return 'https://wa.me/'+digits+'?text='+encodeURIComponent(text);
-}
 function waRender(name){ return (waMessage||'').split('{{nome}}').join(name || 'Cliente'); }
+function waFirstName(name){ return (name||'').trim().split(/\s+/)[0] || 'Cliente'; }
+function waExportCampaignJson(list){
+  const data = list.map(c=>({ nome:c.name, telefone:c.phone, mensagem: waRender(waFirstName(c.name)) }));
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'campanha.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+function waConfirmAndExport(root){
+  const {clients} = Store.data;
+  const selectedClients = clients.filter(c=>waSelected.has(c.id));
+  if(selectedClients.length===0){ showToast('Selecione ao menos um destinatário'); return; }
+  openModal(`
+    <div class="modal-head"><h3>Confirmar envio</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
+    <div class="modal-body">
+      <label style="font-size:12px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:6px;">Texto padrão da mensagem</label>
+      <div style="background:var(--surface-2);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--ink-soft);white-space:pre-wrap;margin-bottom:14px;">${escapeHtml(waMessage)}</div>
+      <label style="font-size:12px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:6px;">Destinatários (${selectedClients.length})</label>
+      <div class="table-wrap" style="max-height:260px;overflow-y:auto;">
+        <table><tbody>${selectedClients.map(c=>`<tr><td>${escapeHtml(c.name)}</td></tr>`).join('')}</tbody></table>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn btn-primary" id="wa-confirm-export">${icon('check')}Confirmar e exportar</button></div>
+  `, mroot=>{
+    mroot.querySelector('#wa-confirm-export').addEventListener('click', ()=>{
+      waExportCampaignJson(selectedClients);
+      closeModal();
+      showToast('Arquivo campanha.json exportado');
+    });
+  });
+}
 
 function renderWhatsapp(root, actions){
   actions.innerHTML='';
@@ -3013,7 +3040,7 @@ function renderWhatsapp(root, actions){
       <div class="card-body" style="display:flex;gap:12px;align-items:flex-start;">
         <div style="flex:none;color:var(--accent);margin-top:1px;">${icon('whatsapp')}</div>
         <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.55;">
-          <strong style="color:var(--ink);">Sobre o envio:</strong> esta página roda dentro do navegador e, por segurança, não pode guardar nem usar diretamente o token da API oficial do WhatsApp Business (Meta) — expor essa credencial numa página compartilhada com a equipe permitiria que qualquer pessoa com o link enviasse mensagens pela conta da clínica. Por isso o envio aqui funciona assim: você escreve a mensagem uma vez, o sistema personaliza com o nome de cada cliente e abre o WhatsApp Web/App já com a conversa e o texto prontos — você só confirma o envio, cliente por cliente. Para automação 100% sem clique via API oficial, é preciso uma integração server-side separada (posso te ajudar a planejar isso depois).
+          <strong style="color:var(--ink);">Sobre o envio:</strong> esta página roda dentro do navegador e, por segurança, não pode guardar nem usar diretamente o token da API oficial do WhatsApp Business (Meta) — expor essa credencial numa página compartilhada com a equipe permitiria que qualquer pessoa com o link enviasse mensagens pela conta da clínica. Por isso o envio aqui funciona assim: você escreve a mensagem uma vez, escolhe os destinatários e clica em "Enviar" — depois de confirmar a mensagem e a lista de nomes, é gerado um arquivo <strong>campanha.json</strong> (mensagem já personalizada com o primeiro nome de cada cliente) para você usar no disparo em massa no seu computador.
         </div>
       </div>
     </div>
@@ -3049,6 +3076,7 @@ function renderWhatsapp(root, actions){
           <div class="flex gap8">
             <button class="btn btn-sm" id="wa-select-all">Selecionar tudo</button>
             <button class="btn btn-sm" id="wa-select-none">Limpar seleção</button>
+            <button class="btn btn-sm btn-primary" id="wa-send-campaign" style="margin-left:auto;">${icon('whatsapp')}Enviar</button>
           </div>
           ${noPhoneCount>0?`<div class="muted" style="font-size:11.5px;">${noPhoneCount} cliente(s) sem telefone cadastrado não aparecem aqui.</div>`:''}
           <div class="table-wrap" style="max-height:340px;overflow-y:auto;">
@@ -3061,7 +3089,6 @@ function renderWhatsapp(root, actions){
                   <td style="width:30px;"><input type="checkbox" class="wa-check" data-id="${c.id}" ${checked?'checked':''} style="width:auto;"/></td>
                   <td class="flex gap10"><div class="avatar">${initials(c.name)}</div><div><div class="cell-strong">${escapeHtml(c.name)}</div><div class="muted" style="font-size:11px;">${escapeHtml(c.phone)}</div></div></td>
                   <td>${tier?`<span class="badge ${tier.cls}">${tier.label}</span>`:''}</td>
-                  <td style="text-align:right;"><a class="btn btn-sm btn-primary" target="_blank" rel="noopener" href="${waLink(c.phone, waRender(c.name))}">${icon('whatsapp')}Enviar</a></td>
                 </tr>`;
               }).join('')}</tbody>
             </table>`}
@@ -3076,13 +3103,8 @@ function renderWhatsapp(root, actions){
   textEl.addEventListener('input', ()=>{
     waMessage = textEl.value;
     previewEl.textContent = waRender(filtered[0]?.name);
-    // refresh each send link's href with the new text
-    root.querySelectorAll('tbody tr').forEach(tr=>{
-      const cb = tr.querySelector('.wa-check');
-      const a = tr.querySelector('a.btn-primary');
-      if(cb && a){ const c = filtered.find(x=>x.id===cb.dataset.id); if(c) a.href = waLink(c.phone, waRender(c.name)); }
-    });
   });
+  root.querySelector('#wa-send-campaign').addEventListener('click', ()=>waConfirmAndExport(root));
   root.querySelector('#wa-search').addEventListener('input', e=>{ waSearch=e.target.value; renderWhatsapp(root,actions); root.querySelector('#wa-search').focus(); });
   root.querySelector('#wa-tier-filter').addEventListener('change', e=>{ waTierFilter=e.target.value; renderWhatsapp(root,actions); });
   root.querySelector('#wa-select-all').addEventListener('click', ()=>{ filtered.forEach(c=>waSelected.add(c.id)); renderWhatsapp(root,actions); });
