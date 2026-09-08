@@ -1840,6 +1840,7 @@ function renderDashboard(root, actions){
   const absSettings = getAbsenceSettings();
   const absentList = getAbsentClients(absSettings.days, absSettings.topN);
   const isAdminDash = typeof currentTeamUser!=='undefined' && currentTeamUser && currentTeamUser.role==='admin';
+  const birthdaysToday = getBirthdayClientsToday();
 
   root.innerHTML = `
     <div class="kpi-grid">
@@ -1873,6 +1874,13 @@ function renderDashboard(root, actions){
       </div>
     </div>
   
+    
+    <div class="card" style="margin-bottom:16px;border:1px solid var(--accent);">
+      <div class="card-head"><h3><span class="icon-inline">${icon('bell')}</span> Aniversariantes de hoje</h3></div>
+      <div class="card-body tight" style="padding:14px 20px;">
+        ${birthdaysToday.length ? ('<div style="display:flex;flex-wrap:wrap;gap:8px;">'+birthdaysToday.map(function(c){return '<span class="badge" style="background:var(--accent-soft);color:var(--accent-strong);">'+escapeHtml(c.name)+'</span>';}).join('')+'</div>') : '<p class="muted" style="margin:0;font-size:12.5px;">Não existem clientes aniversariantes na data de hoje.</p>'}
+      </div>
+    </div>
     ${absentList.length>0 ? (
     '<div class="card" style="margin-bottom:16px;border:1px solid var(--accent);">' +
       '<div class="card-head"><h3><span class="icon-inline">'+icon('bell')+'</span> Top '+absentList.length+' clientes de maior frequência ausentes há mais de '+absSettings.days+' dias</h3><span class="badge warn">'+absentList.length+'</span></div>' +
