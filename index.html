@@ -4720,8 +4720,7 @@ function getBirthdayClientsToday(){
 function showAbsenceAlertPopupOnce(){
   if(__absenceAlertShown) return;
   var s = getAbsenceSettings();
-  if(!s.enabled) return;
-  var rows = getAbsentClients(s.days, s.topN);
+  var rows = s.enabled ? getAbsentClients(s.days, s.topN) : [];
   var birthdays = getBirthdayClientsToday();
   if(!rows.length && !birthdays.length) return;
   __absenceAlertShown = true;
