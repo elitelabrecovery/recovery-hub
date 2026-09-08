@@ -4696,31 +4696,58 @@ async function ensureServicesUppercase(){
 }
 
 let __absenceAlertShown = false;
+function getBirthdayClientsToday(){
+  var clients = Store.data.clients;
+  var now = new Date();
+  var mm = String(now.getMonth()+1).padStart(2,'0');
+  var dd = String(now.getDate()).padStart(2,'0');
+  return clients.filter(function(c){
+    if((c.status||'ativo')!=='ativo') return false;
+    if(!c.birthDate) return false;
+    var parts = c.birthDate.split('-');
+    return parts.length===3 && parts[1]===mm && parts[2]===dd;
+  });
+}
+
 function showAbsenceAlertPopupOnce(){
   if(__absenceAlertShown) return;
   var s = getAbsenceSettings();
   if(!s.enabled) return;
   var rows = getAbsentClients(s.days, s.topN);
-  if(!rows.length) return;
+  var birthdays = getBirthdayClientsToday();
+  if(!rows.length && !birthdays.length) return;
   __absenceAlertShown = true;
   var rowsHtml = rows.map(function(x){
     var daysAbsent = x.last ? Math.floor((new Date() - new Date(x.last+'T00:00:00'))/86400000) : '—';
     var valueStr = x.lastValue!=null ? fmtMoney(x.lastValue) : '—';
     return '<tr><td class="cell-strong">'+escapeHtml(x.c.name)+'</td><td style="text-align:center;">'+daysAbsent+'</td><td>'+(x.last?fmtDate(x.last):'—')+'</td><td>'+escapeHtml(x.lastService||'—')+'</td><td style="text-align:right;">'+valueStr+'</td></tr>';
   }).join('');
+  var birthdayHtml = birthdays.length ? (
+    '<div style="padding:14px 20px;border-bottom:1px solid var(--border);">' +
+      '<div style="font-weight:700;color:var(--accent-strong);font-size:14px;margin-bottom:8px;">🎂 Aniversariantes de hoje</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
+        birthdays.map(function(c){ return '<span class="badge" style="background:var(--accent-soft);color:var(--accent-strong);">'+escapeHtml(c.name)+'</span>'; }).join('') +
+      '</div>' +
+    '</div>'
+  ) : '';
+  var headerTitle = rows.length ? ('Clientes ausentes há mais de '+s.days+' dias') : 'Alertas do dia';
+  var headerSubtitle = rows.length ? ('Top '+rows.length+' de maior frequência na clínica') : (birthdays.length ? 'Confira os aniversariantes de hoje' : '');
   var overlay = document.createElement('div');
   overlay.id = 'absenceAlertOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(24,21,18,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
   overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;max-width:740px;width:100%;max-height:82vh;overflow:auto;box-shadow:var(--shadow);border-top:6px solid var(--accent);">' +
     '<div style="padding:16px 20px;display:flex;align-items:center;gap:10px;background:var(--accent-soft);">' +
       '<span class="icon-inline">'+icon('bell')+'</span>' +
-      '<div><div style="font-weight:700;color:var(--accent-strong);font-size:16px;">Clientes ausentes há mais de '+s.days+' dias</div>' +
-      '<div style="font-size:13px;color:var(--accent-strong);">Top '+rows.length+' de maior frequência na clínica</div></div>' +
+      '<div><div style="font-weight:700;color:var(--accent-strong);font-size:16px;">'+headerTitle+'</div>' +
+      (headerSubtitle ? ('<div style="font-size:13px;color:var(--accent-strong);">'+headerSubtitle+'</div>') : '') + '</div>' +
       '<button id="absenceAlertClose" class="btn btn-ghost icon-btn" style="margin-left:auto;color:var(--accent-strong);">'+icon('close')+'</button>' +
     '</div>' +
+    birthdayHtml +
+    (rows.length ? (
     '<div class="card-body tight" style="padding:12px 20px 20px;">' +
       '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th style="text-align:center;">Dias ausente</th><th>Última sessão</th><th>Último serviço</th><th style="text-align:right;">Valor última sessão</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>' +
-    '</div>' +
+    '</div>'
+    ) : '') +
   '</div>';
   document.body.appendChild(overlay);
   overlay.querySelector('#absenceAlertClose').addEventListener('click', function(){ overlay.remove(); });
