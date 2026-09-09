@@ -937,6 +937,107 @@ function wirePhotoSection(root, photosState){
   });
 }
 
+/* ---------- ANEXO ÚNICO (foto câmera/galeria OU documento) — usado no lançamento financeiro ---------- */
+function readFileAsDataURL(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=>reject(new Error('Falha ao ler arquivo'));
+    reader.onload = ()=>resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+function fmtFileSize(bytes){
+  if(bytes===null || bytes===undefined || isNaN(bytes)) return '';
+  if(bytes < 1024) return bytes+' B';
+  if(bytes < 1024*1024) return Math.round(bytes/1024)+' KB';
+  return (bytes/(1024*1024)).toFixed(1)+' MB';
+}
+function dataUrlToBlob(dataUrl){
+  const parts = dataUrl.split(',');
+  const mimeMatch = parts[0].match(/data:(.*?);base64/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  const binary = atob(parts[1]);
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++){ bytes[i] = binary.charCodeAt(i); }
+  return new Blob([bytes], {type: mime});
+}
+function openAttachment(att){
+  if(!att || !att.dataUrl) return;
+  try{
+    const blob = dataUrlToBlob(att.dataUrl);
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, '_blank');
+    if(!w){ showToast('Permita pop-ups para visualizar o anexo'); }
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  }catch(e){ showToast('Não foi possível abrir o anexo'); }
+}
+const ATTACH_MAX_CHARS = 900000; // ~ limite seguro para caber num documento do Firestore
+const ATTACH_MAX_DOC_BYTES = 700000; // ~700KB de arquivo original (documentos não são comprimidos)
+function attachmentPreviewHtml(att){
+  if(!att) return '<div class="muted" style="font-size:12.5px;" data-attach-empty>Nenhum anexo adicionado</div>';
+  if(att.type && att.type.indexOf('image/')===0){
+    return `<div class="photo-thumb"><img src="${att.dataUrl}" alt="${escapeHtml(att.name||'Anexo')}"/><button type="button" class="photo-del" data-attach-del>${icon('close')}</button></div>`;
+  }
+  return `<div class="flex gap8" style="align-items:center;border:1px solid var(--border);border-radius:8px;padding:8px 10px;">
+    ${icon('file')}<span style="font-size:12.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(att.name||'Documento')}${att.size?` <span class="muted">(${fmtFileSize(att.size)})</span>`:''}</span>
+    <button type="button" class="btn btn-ghost icon-btn btn-danger" data-attach-del>${icon('close')}</button>
+  </div>`;
+}
+function attachmentFieldHtml(att){
+  return `
+    <div class="field">
+      <label>Anexo <span class="hint">(opcional — foto ou documento do comprovante)</span></label>
+      <div id="attach-preview">${attachmentPreviewHtml(att)}</div>
+      <div class="photo-actions">
+        <button type="button" class="btn btn-sm" id="btn-attach-camera">${icon('camera')}Tirar foto</button>
+        <button type="button" class="btn btn-sm" id="btn-attach-gallery">${icon('image')}Galeria</button>
+        <button type="button" class="btn btn-sm" id="btn-attach-doc">${icon('file')}Anexar documento</button>
+      </div>
+      <input type="file" id="attach-input-camera" accept="image/*" capture="environment" style="display:none"/>
+      <input type="file" id="attach-input-gallery" accept="image/*" style="display:none"/>
+      <input type="file" id="attach-input-doc" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" style="display:none"/>
+    </div>`;
+}
+function wireAttachmentField(root, state){
+  const preview = root.querySelector('#attach-preview');
+  const camInput = root.querySelector('#attach-input-camera');
+  const galInput = root.querySelector('#attach-input-gallery');
+  const docInput = root.querySelector('#attach-input-doc');
+  const wireDelete = ()=>{
+    const delBtn = preview.querySelector('[data-attach-del]');
+    if(delBtn) delBtn.addEventListener('click', ()=>{ state.current=null; rerender(); });
+  };
+  const rerender = ()=>{ preview.innerHTML = attachmentPreviewHtml(state.current); wireDelete(); };
+  const setImage = async (file)=>{
+    try{
+      const dataUrl = await compressImageFile(file, 1600, 0.75);
+      if(dataUrl.length > ATTACH_MAX_CHARS){ showToast('Imagem muito grande mesmo após compressão. Tente outra foto.'); return; }
+      state.current = { name: file.name||'foto.jpg', type:'image/jpeg', dataUrl, size: Math.round(dataUrl.length*0.75) };
+      rerender();
+    }catch(e){ showToast('Não foi possível processar a foto'); }
+  };
+  const setDoc = async (file)=>{
+    if(file.size > ATTACH_MAX_DOC_BYTES){ showToast('Arquivo muito grande (máx. ~700 KB). Tente um arquivo menor.'); return; }
+    try{
+      const dataUrl = await readFileAsDataURL(file);
+      if(dataUrl.length > ATTACH_MAX_CHARS){ showToast('Arquivo muito grande. Tente um arquivo menor.'); return; }
+      state.current = { name: file.name||'documento', type: file.type||'application/octet-stream', dataUrl, size: file.size };
+      rerender();
+    }catch(e){ showToast('Não foi possível anexar o arquivo'); }
+  };
+  if(camInput) camInput.addEventListener('change', async e=>{ const f=e.target.files[0]; if(f) await setImage(f); camInput.value=''; });
+  if(galInput) galInput.addEventListener('change', async e=>{ const f=e.target.files[0]; if(f) await setImage(f); galInput.value=''; });
+  if(docInput) docInput.addEventListener('change', async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    if(f.type && f.type.indexOf('image/')===0){ await setImage(f); } else { await setDoc(f); }
+    docInput.value='';
+  });
+  root.querySelector('#btn-attach-camera').addEventListener('click', ()=>camInput.click());
+  root.querySelector('#btn-attach-gallery').addEventListener('click', ()=>galInput.click());
+  root.querySelector('#btn-attach-doc').addEventListener('click', ()=>docInput.click());
+  wireDelete();
+}
+
 /* ---------- EXPORT HELPERS (Excel / PDF) ---------- */
 function exportToExcel(filename, sheets){
   if(typeof XLSX==='undefined'){ showToast('Biblioteca de exportação não carregou. Verifique sua conexão e tente novamente.'); return; }
@@ -2823,7 +2924,10 @@ function renderFinance(root, actions){
               <td>${escapeHtml(t.clientName||'—')}</td>
               <td><span class="badge ${t.type==='receita'?'good':'bad'}">${t.type==='receita'?'Receita':'Despesa'}</span></td>
               <td class="tnum cell-strong" style="color:${t.type==='receita'?'var(--good)':'var(--bad)'}">${t.type==='receita'?'+':'−'} ${fmtMoney(t.amount)}</td>
-              <td><div class="row-actions"><button class="btn btn-ghost icon-btn btn-danger" data-del="${t.id}">${icon('trash')}</button></div></td>
+              <td><div class="row-actions">
+                ${t.attachmentData ? `<button class="btn btn-ghost icon-btn" data-view-attach="${t.id}" title="Ver anexo">${icon(t.attachmentType&&t.attachmentType.indexOf('image/')===0?'image':'file')}</button>` : ''}
+                <button class="btn btn-ghost icon-btn btn-danger" data-del="${t.id}">${icon('trash')}</button>
+              </div></td>
             </tr>`).join('')}</tbody>
         </table></div>`}
       </div>
@@ -2845,6 +2949,11 @@ function renderFinance(root, actions){
   }));
   root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
     if(confirm('Remover este lançamento?')){ Store.remove('transactions', b.dataset.del); showToast('Lançamento removido'); }
+  }));
+  root.querySelectorAll('[data-view-attach]').forEach(b=>b.addEventListener('click', ()=>{
+    const t = transactions.find(x=>x.id===b.dataset.viewAttach);
+    if(!t || !t.attachmentData) return;
+    openAttachment({ dataUrl: t.attachmentData, type: t.attachmentType, name: t.attachmentName });
   }));
   root.querySelector('#btn-new-recurring').addEventListener('click', openRecurringForm);
   root.querySelectorAll('[data-toggle]').forEach(b=>b.addEventListener('click', ()=>{
@@ -2886,6 +2995,7 @@ function openRecurringForm(){
 
 function openTxForm(){
   const {clients}=Store.data;
+  const attachState = { current: null };
   openModal(`
     <div class="modal-head"><h3>Novo lançamento</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
     <div class="modal-body">
@@ -2901,16 +3011,24 @@ function openTxForm(){
       <div class="field"><label>Cliente vinculado <span class="hint">(opcional, só para receitas)</span></label>
         <select id="f-client"><option value="">Nenhum</option>${clients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
       </div>
+      ${attachmentFieldHtml(attachState.current)}
     </div>
     <div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn btn-primary" id="f-save">${icon('check')}Salvar</button></div>
   `, root=>{
+    wireAttachmentField(root, attachState);
     root.querySelector('#f-save').addEventListener('click', async ()=>{
       const amount=Number(root.querySelector('#f-amount').value);
       const desc=root.querySelector('#f-desc').value.trim();
       if(!desc || !amount){ showToast('Preencha descrição e valor'); return; }
       const clientId=root.querySelector('#f-client').value;
       const client=clients.find(c=>c.id===clientId);
-      await Store.add('transactions', { type:root.querySelector('#f-type').value, description:desc, amount, date:root.querySelector('#f-date').value||todayISO(), category:root.querySelector('#f-cat').value.trim()||'Geral', clientId:clientId||null, clientName:client?.name||null });
+      const payload = { type:root.querySelector('#f-type').value, description:desc, amount, date:root.querySelector('#f-date').value||todayISO(), category:root.querySelector('#f-cat').value.trim()||'Geral', clientId:clientId||null, clientName:client?.name||null };
+      if(attachState.current){
+        payload.attachmentData = attachState.current.dataUrl;
+        payload.attachmentName = attachState.current.name;
+        payload.attachmentType = attachState.current.type;
+      }
+      await Store.add('transactions', payload);
       showToast('Lançamento registrado'); closeModal();
     });
   });
