@@ -2607,7 +2607,7 @@ function openApptForm(existing){
   const serviceItems = services.map(s=>({id:s.id, label:s.name, sub:fmtMoney(s.price), price:s.price}));
   openModal(`
     <div class="modal-head"><h3>${isEdit?'Editar agendamento':'Novo agendamento'}</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
-    ${existing && existing.createdByName ? `<p class="muted" style="margin:0 16px 8px;font-size:11.5px;">Agendado por ${escapeHtml(existing.createdByName)}${existing.updatedByName && existing.updatedByName!==existing.createdByName ? ' · atualizado por '+escapeHtml(existing.updatedByName) : ''}</p>` : ''}
+    ${existing && existing.createdByName ? `<p class="muted" style="margin:0 16px 8px;font-size:11.5px;">Agendado por ${escapeHtml(existing.createdByName)}${existing.createdAt ? ' em '+fmtDateTime(existing.createdAt) : ''}${existing.updatedByName ? ' · Última atualização por '+escapeHtml(existing.updatedByName)+(existing.updatedAt ? ' em '+fmtDateTime(existing.updatedAt) : '') : ''}</p>` : ''}
     <div class="modal-body">
       <div class="field"><label>Cliente</label>
         ${searchableSelectHTML('f-client', clientItems, existing?.clientId, clients.length===0?'Cadastre um cliente primeiro':'Digite o nome do cliente...')}
