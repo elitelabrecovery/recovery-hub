@@ -2592,7 +2592,8 @@ async function completeAppointment(appt){
   if(!appt) return;
   const pay = confirm('Marcar como concluído e registrar o pagamento agora?\nOK = concluído + pago   |   Cancelar = concluído, pagamento pendente');
   await Store.update('appointments', appt.id, {status:'concluido', paymentStatus: pay?'pago':'pendente'});
-  if(pay){
+  const jaTemLancamento = (Store.data.transactions||[]).some(t=>t.appointmentId===appt.id);
+  if(!jaTemLancamento){
     await Store.add('transactions', {type:'receita', amount:Number(appt.price)||0, description:`${appt.serviceName} — ${appt.clientName}`, category:'Atendimento', date: todayISO(), method:'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id});
   }
   GCal.syncUpsert({...appt, status:'concluido'});
@@ -2640,12 +2641,16 @@ function openApptForm(existing){
       if(!clientId || !serviceId){ showToast('Selecione cliente e serviço'); return; }
       const client=clients.find(c=>c.id===clientId), service=services.find(s=>s.id===serviceId);
       const payload={ clientId, clientName:client?.name||'', serviceId, serviceName:service?.name||'', date:root.querySelector('#f-date').value||todayISO(), time:root.querySelector('#f-time').value, price:Number(root.querySelector('#f-price').value)||0, status:root.querySelector('#f-status').value, notes:root.querySelector('#f-notes').value.trim(), paymentStatus:existing?.paymentStatus||'pendente', nfseStatus:root.querySelector('#f-nfse').value, ...(existing?.gcalSource==='google'?{needsReview:false}:{}) };
+      let apptId = existing?.id;
       if(isEdit){
         await Store.update('appointments', existing.id, payload);
         GCal.syncUpsert({...existing, ...payload, id:existing.id});
       } else {
-        const newId = await Store.add('appointments', payload);
-        GCal.syncUpsert({...payload, id:newId});
+        apptId = await Store.add('appointments', payload);
+        GCal.syncUpsert({...payload, id:apptId});
+      }
+      if(payload.status==='concluido' && !(Store.data.transactions||[]).some(t=>t.appointmentId===apptId)){
+        await Store.add('transactions', {type:'receita', amount:Number(payload.price)||0, description:`${payload.serviceName} — ${payload.clientName}`, category:'Atendimento', date: payload.date||todayISO(), method:'—', clientId:payload.clientId, clientName:payload.clientName, serviceId:payload.serviceId, serviceName:payload.serviceName, appointmentId:apptId});
       }
       showToast(isEdit?'Agendamento atualizado':'Agendamento criado'); closeModal();
     });
