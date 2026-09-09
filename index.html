@@ -232,6 +232,7 @@
   .badge.warn{background:var(--warn-soft);color:var(--warn);}
   .badge.bad{background:var(--bad-soft);color:var(--bad);}
   .badge.muted{background:var(--surface-2);color:var(--muted);}
+  .badge-btn{border:none;cursor:pointer;font:inherit;}
   .badge.tier-ouro{background:var(--tier-ouro-bg);color:var(--tier-ouro-ink);}
   .badge.tier-prata{background:var(--tier-prata-bg);color:var(--tier-prata-ink);}
   .badge.tier-bronze{background:var(--tier-bronze-bg);color:var(--tier-bronze-ink);}
@@ -1001,6 +1002,8 @@ function getAbsentClients(days, topN){
 const SERVICE_CATEGORIES = ['FISIOTERAPIA','RECOVERY & PERFORMANCE','AVALIAÇÃO','TERAPIA MANUAL','OUTRO'];
 const APPT_STATUS = { agendado:{label:'Agendado',cls:'muted'}, concluido:{label:'Concluído',cls:'good'}, cancelado:{label:'Cancelado',cls:'bad'}, faltou:{label:'Faltou',cls:'warn'} };
 const PAY_STATUS = { pendente:{label:'Pendente',cls:'warn'}, pago:{label:'Pago',cls:'good'} };
+const NFSE_STATUS = { pendente:{label:'NFS-e pendente',cls:'warn'}, emitida:{label:'NFS-e emitida',cls:'good'}, nao_aplicavel:{label:'NFS-e não aplicável',cls:'muted'} };
+const NFSE_STATUS_ORDER = ['pendente','emitida','nao_aplicavel'];
 const CLIENT_STATUS = { ativo:{label:'Ativo',cls:'good'}, inativo:{label:'Inativo',cls:'muted'} };
 const CLIENT_TIERS = { ouro:{label:'Ouro',cls:'tier-ouro'}, prata:{label:'Prata',cls:'tier-prata'}, bronze:{label:'Bronze',cls:'tier-bronze'} };
 
@@ -2367,12 +2370,14 @@ function exportAgendaExcel(list){
   const rows = list.map(a=>({
     'Data': fmtDate(a.date), 'Hora': a.time||'', 'Cliente': a.clientName||'', 'Serviço': a.serviceName||'',
     'Valor (R$)': Number(a.price)||0, 'Status': APPT_STATUS[a.status]?.label||a.status||'',
-    'Pagamento': PAY_STATUS[a.paymentStatus||'pendente']?.label||'', 'Observações': a.notes||''
+    'Pagamento': PAY_STATUS[a.paymentStatus||'pendente']?.label||'',
+    'NFS-e': NFSE_STATUS[a.nfseStatus||'pendente']?.label||'', 'Observações': a.notes||''
   }));
   exportToExcel('agenda-elitelab.xlsx', {'Agenda': rows});
 }
 
 function apptRowHTML(a, withDate){
+  const nfseKey = a.nfseStatus||'pendente';
   return `<tr>
     ${withDate?`<td class="tnum">${fmtDate(a.date)}</td>`:''}
     <td class="tnum">${a.time||'—'}</td>
@@ -2381,6 +2386,7 @@ function apptRowHTML(a, withDate){
     <td class="tnum">${fmtMoney(a.price)}</td>
     <td><span class="badge ${APPT_STATUS[a.status]?.cls}">${APPT_STATUS[a.status]?.label}</span></td>
     <td><span class="badge ${PAY_STATUS[a.paymentStatus||'pendente']?.cls}">${PAY_STATUS[a.paymentStatus||'pendente']?.label}</span></td>
+    <td><button type="button" class="badge-btn badge ${NFSE_STATUS[nfseKey]?.cls}" data-nfse="${a.id}" title="Clique para alternar o status da NFS-e">${NFSE_STATUS[nfseKey]?.label}</button></td>
     <td><div class="row-actions">
       ${a.status==='agendado'?`<button class="btn btn-sm" data-done="${a.id}">Concluir</button>`:''}
       <button class="btn btn-ghost icon-btn" data-edit="${a.id}">${icon('edit')}</button>
@@ -2449,7 +2455,7 @@ function renderAgenda(root, actions){
         <div class="card-body tight">
           ${list.length===0 ? `<div class="empty">${icon('agenda')}<p>Nenhum agendamento nesta visão.</p></div>` :
           `<div class="table-wrap"><table>
-            <thead><tr><th>Data</th><th>Hora</th><th>Cliente</th><th>Serviço</th><th>Valor</th><th>Status</th><th>Pagamento</th><th></th></tr></thead>
+            <thead><tr><th>Data</th><th>Hora</th><th>Cliente</th><th>Serviço</th><th>Valor</th><th>Status</th><th>Pagamento</th><th>NFS-e</th><th></th></tr></thead>
             <tbody>${list.map(a=>apptRowHTML(a, true)).join('')}</tbody>
           </table></div>`}
         </div>
@@ -2536,7 +2542,7 @@ function renderAgenda(root, actions){
         <div class="card-body tight">
           ${selectedList.length===0? `<div class="empty">${icon('agenda')}<p>Nenhum agendamento neste dia.</p></div>` :
           `<div class="table-wrap"><table>
-            <thead><tr><th>Hora</th><th>Cliente</th><th>Serviço</th><th>Valor</th><th>Status</th><th>Pagamento</th><th></th></tr></thead>
+            <thead><tr><th>Hora</th><th>Cliente</th><th>Serviço</th><th>Valor</th><th>Status</th><th>Pagamento</th><th>NFS-e</th><th></th></tr></thead>
             <tbody>${selectedList.map(a=>apptRowHTML(a, false)).join('')}</tbody>
           </table></div>`}
         </div>
@@ -2570,6 +2576,14 @@ function renderAgenda(root, actions){
     }
   }));
   root.querySelectorAll('[data-done]').forEach(b=>b.addEventListener('click', ()=>completeAppointment(appointments.find(a=>a.id===b.dataset.done))));
+  root.querySelectorAll('[data-nfse]').forEach(b=>b.addEventListener('click', async ()=>{
+    const appt = appointments.find(a=>a.id===b.dataset.nfse);
+    if(!appt) return;
+    const cur = appt.nfseStatus||'pendente';
+    const next = NFSE_STATUS_ORDER[(NFSE_STATUS_ORDER.indexOf(cur)+1)%NFSE_STATUS_ORDER.length];
+    await Store.update('appointments', appt.id, {nfseStatus: next});
+    showToast(`NFS-e: ${NFSE_STATUS[next].label}`);
+  }));
   const exportAgendaBtn = actions.querySelector('#btn-export-agenda');
   if(exportAgendaBtn) exportAgendaBtn.addEventListener('click', ()=>exportAgendaExcel(exportList));
 }
@@ -2610,6 +2624,9 @@ function openApptForm(existing){
           <select id="f-status">${Object.entries(APPT_STATUS).map(([k,v])=>`<option value="${k}" ${existing?.status===k?'selected':''}>${v.label}</option>`).join('')}</select>
         </div>
       </div>
+      <div class="field"><label>NFS-e</label>
+        <select id="f-nfse">${NFSE_STATUS_ORDER.map(k=>`<option value="${k}" ${(existing?.nfseStatus||'pendente')===k?'selected':''}>${NFSE_STATUS[k].label}</option>`).join('')}</select>
+      </div>
       <div class="field"><label>Observações</label><textarea id="f-notes">${escapeHtml(existing?.notes||'')}</textarea></div>
     </div>
     <div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn btn-primary" id="f-save">${icon('check')}Salvar</button></div>
@@ -2622,7 +2639,7 @@ function openApptForm(existing){
       const clientId=root.querySelector('#f-client').value, serviceId=root.querySelector('#f-service').value;
       if(!clientId || !serviceId){ showToast('Selecione cliente e serviço'); return; }
       const client=clients.find(c=>c.id===clientId), service=services.find(s=>s.id===serviceId);
-      const payload={ clientId, clientName:client?.name||'', serviceId, serviceName:service?.name||'', date:root.querySelector('#f-date').value||todayISO(), time:root.querySelector('#f-time').value, price:Number(root.querySelector('#f-price').value)||0, status:root.querySelector('#f-status').value, notes:root.querySelector('#f-notes').value.trim(), paymentStatus:existing?.paymentStatus||'pendente', ...(existing?.gcalSource==='google'?{needsReview:false}:{}) };
+      const payload={ clientId, clientName:client?.name||'', serviceId, serviceName:service?.name||'', date:root.querySelector('#f-date').value||todayISO(), time:root.querySelector('#f-time').value, price:Number(root.querySelector('#f-price').value)||0, status:root.querySelector('#f-status').value, notes:root.querySelector('#f-notes').value.trim(), paymentStatus:existing?.paymentStatus||'pendente', nfseStatus:root.querySelector('#f-nfse').value, ...(existing?.gcalSource==='google'?{needsReview:false}:{}) };
       if(isEdit){
         await Store.update('appointments', existing.id, payload);
         GCal.syncUpsert({...existing, ...payload, id:existing.id});
