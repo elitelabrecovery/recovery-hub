@@ -2955,7 +2955,8 @@ function renderFinance(root, actions){
               <td class="tnum cell-strong" style="color:${t.type==='receita'?'var(--good)':'var(--bad)'}">${t.type==='receita'?'+':'−'} ${fmtMoney(t.amount)}</td>
               <td><div class="row-actions">
                 ${t.attachmentData ? `<button class="btn btn-ghost icon-btn" data-view-attach="${t.id}" title="Ver anexo">${icon(t.attachmentType&&t.attachmentType.indexOf('image/')===0?'image':'file')}</button>` : ''}
-                <button class="btn btn-ghost icon-btn btn-danger" data-del="${t.id}">${icon('trash')}</button>
+                <button class="btn btn-ghost icon-btn" data-edit-tx="${t.id}" title="Editar data e valor">${icon('edit')}</button>
+<button class="btn btn-ghost icon-btn btn-danger" data-del="${t.id}">${icon('trash')}</button>
               </div></td>
             </tr>`).join('')}</tbody>
         </table></div>`}
@@ -2985,6 +2986,10 @@ renderFinance(root,actions);
   root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
     if(confirm('Remover este lançamento?')){ Store.remove('transactions', b.dataset.del); showToast('Lançamento removido'); }
   }));
+root.querySelectorAll('[data-edit-tx]').forEach(b=>b.addEventListener('click', ()=>{
+const tx = transactions.find(x=>x.id===b.dataset.editTx);
+if(tx) openTxEditForm(tx);
+}));
   root.querySelectorAll('[data-view-attach]').forEach(b=>b.addEventListener('click', ()=>{
     const t = transactions.find(x=>x.id===b.dataset.viewAttach);
     if(!t || !t.attachmentData) return;
@@ -3067,6 +3072,28 @@ function openTxForm(){
       showToast('Lançamento registrado'); closeModal();
     });
   });
+}
+
+function openTxEditForm(tx){
+openModal(`
+<div class="modal-head"><h3>Editar lançamento</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
+<div class="modal-body">
+<div class="field"><label>Descrição</label><div class="muted" style="font-size:13px;">${escapeHtml(tx.description||tx.clientName||'—')}</div></div>
+<div class="field-row">
+<div class="field"><label>Valor (R$)</label><input id="f-edit-amount" type="number" min="0" step="0.01" value="${Number(tx.amount)||0}"/></div>
+<div class="field"><label>Data</label><input id="f-edit-date" type="date" value="${tx.date||todayISO()}"/></div>
+</div>
+</div>
+<div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn btn-primary" id="f-edit-save">${icon('check')}Salvar</button></div>
+`, root=>{
+root.querySelector('#f-edit-save').addEventListener('click', async ()=>{
+const amount=Number(root.querySelector('#f-edit-amount').value);
+const date=root.querySelector('#f-edit-date').value;
+if(!date){ showToast('Informe a data'); return; }
+await Store.update('transactions', tx.id, {date, amount});
+showToast('Lançamento atualizado'); closeModal();
+});
+});
 }
 
 /* ---------- RANKING ---------- */
