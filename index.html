@@ -2459,6 +2459,9 @@ let agendaViewMode='list'; // 'list' | 'week' | 'month'
 let agendaWeekStart=null; // ISO date (Monday) of the shown week; null = week of today
 let agendaMonthKey=null; // 'YYYY-MM'; null = current month
 let agendaSelectedDay=null; // ISO date selected in month view
+let agendaSortField=null; // column key for manual sort in Lista view
+let agendaSortDir='asc'; // 'asc' | 'desc'
+let agendaFilterDate=''; // ISO date filter used in Concluídos/Cancelados
 
 function toISODate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function addDaysISO(dateStr, n){ const d=new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return toISODate(d); }
@@ -2477,6 +2480,11 @@ function exportAgendaExcel(list){
   exportToExcel('agenda-elitelab.xlsx', {'Agenda': rows});
 }
 
+function agendaSortTh(field, label){
+const active = agendaSortField===field;
+const arrow = active ? (agendaSortDir==='asc' ? ' ▲' : ' ▼') : '';
+return `<th class="agenda-sort-th" data-sort="${field}" style="cursor:pointer;user-select:none;white-space:nowrap;" title="Ordenar por ${label}">${label}${arrow}</th>`;
+}
 function apptRowHTML(a, withDate){
   const nfseKey = a.nfseStatus||'pendente';
   return `<tr>
@@ -2538,27 +2546,40 @@ function renderAgenda(root, actions){
 
   if(agendaViewMode==='list'){
     let list = [...appointments];
-    if(agendaFilter==='upcoming') list = list.filter(a=>a.date>=today && a.status==='agendado');
-    else if(agendaFilter==='today') list = list.filter(a=>a.date===today);
-    else if(agendaFilter==='done') list = list.filter(a=>a.status==='concluido');
-    else if(agendaFilter==='cancel') list = list.filter(a=>a.status==='cancelado'||a.status==='faltou');
-    list.sort((a,b)=> (a.date+((a.time)||'')).localeCompare(b.date+(b.time||'')));
-    exportList = list;
+if(agendaFilter==='upcoming') list = list.filter(a=>a.date>=today && a.status==='agendado');
+else if(agendaFilter==='today') list = list.filter(a=>a.date===today);
+else if(agendaFilter==='done') list = list.filter(a=>a.status==='concluido');
+else if(agendaFilter==='cancel') list = list.filter(a=>a.status==='cancelado'||a.status==='faltou');
+if((agendaFilter==='done'||agendaFilter==='cancel') && agendaFilterDate) list = list.filter(a=>a.date===agendaFilterDate);
+const AGENDA_SORT_FNS = {
+date: (a,b)=> (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')),
+time: (a,b)=> (a.time||'').localeCompare(b.time||''),
+clientName: (a,b)=> (a.clientName||'').localeCompare(b.clientName||''),
+serviceName: (a,b)=> (a.serviceName||'').localeCompare(b.serviceName||''),
+price: (a,b)=> (Number(a.price)||0) - (Number(b.price)||0),
+status: (a,b)=> (APPT_STATUS[a.status]?.label||'').localeCompare(APPT_STATUS[b.status]?.label||''),
+paymentStatus: (a,b)=> (PAY_STATUS[a.paymentStatus||'pendente']?.label||'').localeCompare(PAY_STATUS[b.paymentStatus||'pendente']?.label||''),
+nfseStatus: (a,b)=> (NFSE_STATUS[a.nfseStatus||'pendente']?.label||'').localeCompare(NFSE_STATUS[b.nfseStatus||'pendente']?.label||''),
+};
+const agendaSortFn = AGENDA_SORT_FNS[agendaSortField] || AGENDA_SORT_FNS.date;
+list.sort((a,b)=> agendaSortFn(a,b) * (agendaSortDir==='desc'?-1:1));
+exportList = list;
 
     bodyHTML = `
       <div class="tabs" id="agenda-tabs" style="margin-top:12px;">
-        <button class="tab ${agendaFilter==='upcoming'?'active':''}" data-f="upcoming">Próximos</button>
-        <button class="tab ${agendaFilter==='today'?'active':''}" data-f="today">Hoje</button>
-        <button class="tab ${agendaFilter==='done'?'active':''}" data-f="done">Concluídos</button>
-        <button class="tab ${agendaFilter==='cancel'?'active':''}" data-f="cancel">Cancelados/Faltas</button>
-      </div>
-      <div class="card" style="margin-top:14px;">
-        <div class="card-body tight">
-          ${list.length===0 ? `<div class="empty">${icon('agenda')}<p>Nenhum agendamento nesta visão.</p></div>` :
-          `<div class="table-wrap"><table>
-            <thead><tr><th>Data</th><th>Hora</th><th>Cliente</th><th>Serviço</th><th>Valor</th><th>Status</th><th>Pagamento</th><th>NFS-e</th><th></th></tr></thead>
-            <tbody>${list.map(a=>apptRowHTML(a, true)).join('')}</tbody>
-          </table></div>`}
+<button class="tab ${agendaFilter==='upcoming'?'active':''}" data-f="upcoming">Próximos</button>
+<button class="tab ${agendaFilter==='today'?'active':''}" data-f="today">Hoje</button>
+<button class="tab ${agendaFilter==='done'?'active':''}" data-f="done">Concluídos</button>
+<button class="tab ${agendaFilter==='cancel'?'active':''}" data-f="cancel">Cancelados/Faltas</button>
+</div>
+${(agendaFilter==='done'||agendaFilter==='cancel') ? `<div class="field" style="max-width:220px;margin:12px 16px 0;"><label>Filtrar por data</label><input type="date" id="agenda-date-filter" value="${agendaFilterDate||''}"/></div>` : ''}
+<div class="card" style="margin-top:14px;">
+<div class="card-body tight">
+${list.length===0 ? `<div class="empty">${icon('agenda')}<p>Nenhum agendamento nesta visão.</p></div>` :
+`<div class="table-wrap"><table>
+<thead><tr>${agendaSortTh('date','Data')}${agendaSortTh('time','Hora')}${agendaSortTh('clientName','Cliente')}${agendaSortTh('serviceName','Serviço')}${agendaSortTh('price','Valor')}${agendaSortTh('status','Status')}${agendaSortTh('paymentStatus','Pagamento')}${agendaSortTh('nfseStatus','NFS-e')}<th></th></tr></thead>
+<tbody>${list.map(a=>apptRowHTML(a, true)).join('')}</tbody>
+</table></div>`}
         </div>
       </div>
     `;
@@ -2657,6 +2678,13 @@ function renderAgenda(root, actions){
 
   if(agendaViewMode==='list'){
     root.querySelectorAll('#agenda-tabs .tab').forEach(t=>t.addEventListener('click', ()=>{ agendaFilter=t.dataset.f; renderAgenda(root,actions); }));
+const agendaDateFilterInput = root.querySelector('#agenda-date-filter');
+if(agendaDateFilterInput) agendaDateFilterInput.addEventListener('change', ()=>{ agendaFilterDate = agendaDateFilterInput.value; renderAgenda(root,actions); });
+root.querySelectorAll('.agenda-sort-th').forEach(th=>th.addEventListener('click', ()=>{
+const f = th.dataset.sort;
+if(agendaSortField===f){ agendaSortDir = agendaSortDir==='asc'?'desc':'asc'; } else { agendaSortField = f; agendaSortDir='asc'; }
+renderAgenda(root,actions);
+}));
   } else if(agendaViewMode==='week'){
     root.querySelector('#week-prev').addEventListener('click', ()=>{ agendaWeekStart = addDaysISO(agendaWeekStart||weekStartISO(today), -7); renderAgenda(root,actions); });
     root.querySelector('#week-next').addEventListener('click', ()=>{ agendaWeekStart = addDaysISO(agendaWeekStart||weekStartISO(today), 7); renderAgenda(root,actions); });
