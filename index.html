@@ -2880,7 +2880,8 @@ function renderFinance(root, actions){
             <button class="btn btn-sm" data-chart-preset="6">6 meses</button>
             <button class="btn btn-sm" data-chart-preset="12">12 meses</button>
             <button class="btn btn-sm" data-chart-preset="24">24 meses</button>
-          </div>
+          <button class="btn btn-sm" id="fin-chart-current">Mês atual</button>
+</div>
         </div>
       </div>
       <div class="card-body">
@@ -2975,6 +2976,12 @@ function renderFinance(root, actions){
     financeChartFrom = shiftMonthKey(financeChartTo, -(n-1));
     renderFinance(root,actions);
   }));
+const finChartCurrentBtn = root.querySelector('#fin-chart-current');
+if(finChartCurrentBtn) finChartCurrentBtn.addEventListener('click', ()=>{
+financeChartTo = currentMonthKey();
+financeChartFrom = currentMonthKey();
+renderFinance(root,actions);
+});
   root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
     if(confirm('Remover este lançamento?')){ Store.remove('transactions', b.dataset.del); showToast('Lançamento removido'); }
   }));
@@ -3201,7 +3208,7 @@ function renderWhatsapp(root, actions){
     if(waTierFilter!=='all' && (c.tier||'nenhum')!==waTierFilter) return false;
     if(waSearch && !(c.name||'').toLowerCase().includes(waSearch.toLowerCase())) return false;
     return true;
-  });
+  }).sort((a,b)=>(a.name||'').localeCompare(b.name||'', 'pt-BR'));
 
   root.innerHTML = `
     <div class="card" style="margin-bottom:16px;background:var(--surface-2);">
