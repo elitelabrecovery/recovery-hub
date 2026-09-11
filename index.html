@@ -2695,7 +2695,7 @@ async function completeAppointment(appt){
   await Store.update('appointments', appt.id, {status:'concluido', paymentStatus: pay?'pago':'pendente'});
   const jaTemLancamento = (Store.data.transactions||[]).some(t=>t.appointmentId===appt.id);
   if(!jaTemLancamento){
-    await Store.add('transactions', {type:'receita', amount:Number(appt.price)||0, description:`${appt.serviceName} — ${appt.clientName}`, category:'Atendimento', date: todayISO(), method:'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id});
+    await Store.add('transactions', {type:'receita', amount:Number(appt.price)||0, description:`${appt.serviceName} — ${appt.clientName}`, category:'Atendimento', date: appt.date, method:'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id});
   }
   GCal.syncUpsert({...appt, status:'concluido'});
   showToast('Agendamento concluído');
