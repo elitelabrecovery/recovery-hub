@@ -1321,7 +1321,7 @@ const GCal = {
     const endStr = `${appt.date}T${pad(end.getHours())}:${pad(end.getMinutes())}:00`;
     const statusLabel = APPT_STATUS[appt.status]?.label || '';
     return {
-      summary: `${appt.clientName||''} — ${appt.serviceName||'Atendimento'} — ${fmtMoney(appt.price)}`,
+      summary: `${appt.serviceName||'Atendimento'} — ${appt.clientName||''}`,
       description: [appt.notes||'', statusLabel?`Status: ${statusLabel}`:''].filter(Boolean).join('\n'),
       start:{ dateTime: start, timeZone:'America/Sao_Paulo' },
       end:{ dateTime: endStr, timeZone:'America/Sao_Paulo' }
@@ -2762,7 +2762,7 @@ async function syncApptRevenue(appt){
   if(!appt || !appt.id) return;
   const existing = (Store.data.transactions||[]).find(t=>t.appointmentId===appt.id);
   if(appt.status==='concluido'){
-    const fields = {type:'receita', amount:Number(appt.price)||0, description:`${appt.clientName} — ${appt.serviceName}`, category:'Atendimento', date: appt.date, method: existing?.method||'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id};
+    const fields = {type:'receita', amount:Number(appt.price)||0, description:`${appt.serviceName} — ${appt.clientName}`, category:'Atendimento', date: appt.date, method: existing?.method||'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id};
     if(existing) await Store.update('transactions', existing.id, fields);
     else await Store.add('transactions', fields);
   } else if(existing){
@@ -2984,15 +2984,15 @@ function renderFinance(root, actions){
       <div class="card-body tight">
         ${list.length===0? `<div class="empty">${icon('cash')}<p>Nenhum lançamento registrado.</p></div>` :
         `<div class="table-wrap"><table>
-          <thead><tr>${thSort('Data','date',financeSort)}${thSort('Descrição','description',financeSort)}${thSort('Categoria','category',financeSort)}${thSort('Cliente','clientName',financeSort)}${thSort('Tipo','type',financeSort)}${thSort('Valor','amount',financeSort)}<th></th></tr></thead>
+          <thead><tr>${thSort('Data','date',financeSort)}${thSort('Valor','amount',financeSort)}${thSort('Tipo','type',financeSort)}${thSort('Descrição','description',financeSort)}${thSort('Cliente','clientName',financeSort)}${thSort('Categoria','category',financeSort)}<th></th></tr></thead>
           <tbody>${list.map(t=>`
             <tr>
               <td class="tnum">${fmtDate(t.date)}</td>
-              <td class="cell-strong">${escapeHtml(t.description||'—')}${t.recurringId?` <span class="badge muted" style="margin-left:4px;">Fixa</span>`:''}</td>
-              <td><span class="badge muted">${escapeHtml(t.category||'—')}</span></td>
-              <td>${escapeHtml(t.clientName||'—')}</td>
-              <td><span class="badge ${t.type==='receita'?'good':'bad'}">${t.type==='receita'?'Receita':'Despesa'}</span></td>
               <td class="tnum cell-strong" style="color:${t.type==='receita'?'var(--good)':'var(--bad)'}">${t.type==='receita'?'+':'−'} ${fmtMoney(t.amount)}</td>
+              <td><span class="badge ${t.type==='receita'?'good':'bad'}">${t.type==='receita'?'Receita':'Despesa'}</span></td>
+              <td class="cell-strong">${escapeHtml(t.description||'—')}${t.recurringId?` <span class="badge muted" style="margin-left:4px;">Fixa</span>`:''}</td>
+              <td>${escapeHtml(t.clientName||'—')}</td>
+              <td><span class="badge muted">${escapeHtml(t.category||'—')}</span></td>
               <td><div class="row-actions">
                 ${t.attachmentData ? `<button class="btn btn-ghost icon-btn" data-view-attach="${t.id}" title="Ver anexo">${icon(t.attachmentType&&t.attachmentType.indexOf('image/')===0?'image':'file')}</button>` : ''}
                 <button class="btn btn-ghost icon-btn" data-edit-tx="${t.id}" title="Editar data e valor">${icon('edit')}</button>
