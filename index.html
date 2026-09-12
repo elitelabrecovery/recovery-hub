@@ -1315,13 +1315,18 @@ const GCal = {
   apptToEvent(appt){
     const time = appt.time || '09:00';
     const start = `${appt.date}T${time}:00`;
+    // Duração: usa a duração informada no agendamento; se não houver (agendamentos
+    // antigos, ou serviço trocado sem duração explícita), cai para a duração
+    // cadastrada no serviço; se nada disso existir, usa 50min como último fallback.
+    const service = (Store.data.services||[]).find(s=>s.id===appt.serviceId);
+    const durationMin = Number(appt.duration) || Number(service?.duration) || 50;
     const end = new Date(`${appt.date}T${time}:00`);
-    end.setMinutes(end.getMinutes() + 50);
+    end.setMinutes(end.getMinutes() + durationMin);
     const pad = n=>String(n).padStart(2,'0');
     const endStr = `${appt.date}T${pad(end.getHours())}:${pad(end.getMinutes())}:00`;
     const statusLabel = APPT_STATUS[appt.status]?.label || '';
     return {
-      summary: `${appt.serviceName||'Atendimento'} — ${appt.clientName||''}`,
+      summary: `${appt.clientName||''} — ${appt.serviceName||'Atendimento'} — ${fmtMoney(appt.price)}`,
       description: [appt.notes||'', statusLabel?`Status: ${statusLabel}`:''].filter(Boolean).join('\n'),
       start:{ dateTime: start, timeZone:'America/Sao_Paulo' },
       end:{ dateTime: endStr, timeZone:'America/Sao_Paulo' }
@@ -2762,7 +2767,7 @@ async function syncApptRevenue(appt){
   if(!appt || !appt.id) return;
   const existing = (Store.data.transactions||[]).find(t=>t.appointmentId===appt.id);
   if(appt.status==='concluido'){
-    const fields = {type:'receita', amount:Number(appt.price)||0, description:`${appt.serviceName} — ${appt.clientName}`, category:'Atendimento', date: appt.date, method: existing?.method||'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id};
+    const fields = {type:'receita', amount:Number(appt.price)||0, description:`${appt.clientName} — ${appt.serviceName}`, category:'Atendimento', date: appt.date, method: existing?.method||'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id};
     if(existing) await Store.update('transactions', existing.id, fields);
     else await Store.add('transactions', fields);
   } else if(existing){
@@ -2774,7 +2779,9 @@ function openApptForm(existing){
   const isEdit=!!existing;
   const {clients, services} = Store.data;
   const clientItems = clients.map(c=>({id:c.id, label:c.name}));
-  const serviceItems = services.map(s=>({id:s.id, label:s.name, sub:fmtMoney(s.price), price:s.price}));
+  const serviceItems = services.map(s=>({id:s.id, label:s.name, sub:fmtMoney(s.price), price:s.price, duration:s.duration}));
+  const existingService = existing ? services.find(s=>s.id===existing.serviceId) : null;
+  const defaultDuration = existing?.duration ?? existingService?.duration ?? services[0]?.duration ?? 50;
   openModal(`
     <div class="modal-head"><h3>${isEdit?'Editar agendamento':'Novo agendamento'}</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
     ${existing && existing.createdByName ? `<p class="muted" style="margin:0 16px 8px;font-size:11.5px;">Agendado por ${escapeHtml(existing.createdByName)}${existing.createdAt ? ' em '+fmtDateTime(existing.createdAt) : ''}${existing.updatedByName ? ' · Última atualização por '+escapeHtml(existing.updatedByName)+(existing.updatedAt ? ' em '+fmtDateTime(existing.updatedAt) : '') : ''}</p>` : ''}
@@ -2790,13 +2797,16 @@ function openApptForm(existing){
         <div class="field"><label>Hora</label><input id="f-time" type="time" value="${existing?.time||'09:00'}"/></div>
       </div>
       <div class="field-row">
+        <div class="field"><label>Duração (min)</label><input id="f-duration" type="number" min="5" step="5" value="${defaultDuration}"/></div>
         <div class="field"><label>Valor (R$)</label><input id="f-price" type="number" min="0" step="0.01" value="${existing?.price ?? (services[0]?.price||0)}"/></div>
+      </div>
+      <div class="field-row">
         <div class="field"><label>Status</label>
           <select id="f-status">${Object.entries(APPT_STATUS).map(([k,v])=>`<option value="${k}" ${existing?.status===k?'selected':''}>${v.label}</option>`).join('')}</select>
         </div>
-      </div>
-      <div class="field"><label>NFS-e</label>
-        <select id="f-nfse">${NFSE_STATUS_ORDER.map(k=>`<option value="${k}" ${(existing?.nfseStatus||'pendente')===k?'selected':''}>${NFSE_STATUS[k].label}</option>`).join('')}</select>
+        <div class="field"><label>NFS-e</label>
+          <select id="f-nfse">${NFSE_STATUS_ORDER.map(k=>`<option value="${k}" ${(existing?.nfseStatus||'pendente')===k?'selected':''}>${NFSE_STATUS[k].label}</option>`).join('')}</select>
+        </div>
       </div>
       <div class="field"><label>Observações</label><textarea id="f-notes">${escapeHtml(existing?.notes||'')}</textarea></div>
     </div>
@@ -2804,14 +2814,20 @@ function openApptForm(existing){
   `, root=>{
     wireSearchableSelect(root, 'f-client', clientItems);
     wireSearchableSelect(root, 'f-service', serviceItems, item=>{
-      if(!isEdit) root.querySelector('#f-price').value = item.price||0;
+      // Ao escolher/trocar o serviço num agendamento NOVO, preenche o padrão (preço e
+      // duração) definido no cadastro do serviço — o usuário pode digitar por cima
+      // para usar um valor/duração diferente só para esse agendamento.
+      if(!isEdit){
+        root.querySelector('#f-price').value = item.price||0;
+        root.querySelector('#f-duration').value = item.duration||50;
+      }
     });
     root.querySelector('#f-save').addEventListener('click', async ()=>{
       const clientId=root.querySelector('#f-client').value, serviceId=root.querySelector('#f-service').value;
       if(!clientId || !serviceId){ showToast('Selecione cliente e serviço'); return; }
       const client=clients.find(c=>c.id===clientId), service=services.find(s=>s.id===serviceId);
       const status=root.querySelector('#f-status').value;
-      const payload={ clientId, clientName:client?.name||'', serviceId, serviceName:service?.name||'', date:root.querySelector('#f-date').value||todayISO(), time:root.querySelector('#f-time').value, price:Number(root.querySelector('#f-price').value)||0, status, notes:root.querySelector('#f-notes').value.trim(), paymentStatus: status==='concluido' ? 'pago' : (existing?.paymentStatus||'pendente'), nfseStatus:root.querySelector('#f-nfse').value, ...(existing?.gcalSource==='google'?{needsReview:false}:{}) };
+      const payload={ clientId, clientName:client?.name||'', serviceId, serviceName:service?.name||'', date:root.querySelector('#f-date').value||todayISO(), time:root.querySelector('#f-time').value, duration:Number(root.querySelector('#f-duration').value)||service?.duration||50, price:Number(root.querySelector('#f-price').value)||0, status, notes:root.querySelector('#f-notes').value.trim(), paymentStatus: status==='concluido' ? 'pago' : (existing?.paymentStatus||'pendente'), nfseStatus:root.querySelector('#f-nfse').value, ...(existing?.gcalSource==='google'?{needsReview:false}:{}) };
       let apptId = existing?.id;
       if(isEdit){
         await Store.update('appointments', existing.id, payload);
