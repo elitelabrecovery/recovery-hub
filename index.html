@@ -1321,7 +1321,7 @@ const GCal = {
     const endStr = `${appt.date}T${pad(end.getHours())}:${pad(end.getMinutes())}:00`;
     const statusLabel = APPT_STATUS[appt.status]?.label || '';
     return {
-      summary: `${appt.serviceName||'Atendimento'} — ${appt.clientName||''}`,
+      summary: `${appt.clientName||''} — ${appt.serviceName||'Atendimento'} — ${fmtMoney(appt.price)}`,
       description: [appt.notes||'', statusLabel?`Status: ${statusLabel}`:''].filter(Boolean).join('\n'),
       start:{ dateTime: start, timeZone:'America/Sao_Paulo' },
       end:{ dateTime: endStr, timeZone:'America/Sao_Paulo' }
@@ -2762,7 +2762,7 @@ async function syncApptRevenue(appt){
   if(!appt || !appt.id) return;
   const existing = (Store.data.transactions||[]).find(t=>t.appointmentId===appt.id);
   if(appt.status==='concluido'){
-    const fields = {type:'receita', amount:Number(appt.price)||0, description:`${appt.serviceName} — ${appt.clientName}`, category:'Atendimento', date: appt.date, method: existing?.method||'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id};
+    const fields = {type:'receita', amount:Number(appt.price)||0, description:`${appt.clientName} — ${appt.serviceName}`, category:'Atendimento', date: appt.date, method: existing?.method||'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id};
     if(existing) await Store.update('transactions', existing.id, fields);
     else await Store.add('transactions', fields);
   } else if(existing){
