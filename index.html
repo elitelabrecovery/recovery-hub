@@ -2721,12 +2721,26 @@ async function completeAppointment(appt){
   if(!appt) return;
   if(!confirm('Marcar este agendamento como concluído?\nO pagamento será registrado automaticamente como PAGO e lançado no Financeiro como receita, na data do agendamento.')) return;
   await Store.update('appointments', appt.id, {status:'concluido', paymentStatus:'pago'});
-  const jaTemLancamento = (Store.data.transactions||[]).some(t=>t.appointmentId===appt.id);
-  if(!jaTemLancamento){
-    await Store.add('transactions', {type:'receita', amount:Number(appt.price)||0, description:`${appt.serviceName} — ${appt.clientName}`, category:'Atendimento', date: appt.date, method:'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id});
-  }
+  await syncApptRevenue({...appt, status:'concluido'});
   GCal.syncUpsert({...appt, status:'concluido'});
   showToast('Agendamento concluído e pago');
+}
+
+// Mantém o lançamento de receita do Financeiro sincronizado com um agendamento:
+// - se o agendamento está concluído, cria (ou atualiza, se já existir) o lançamento
+//   de receita ligado a ele com o valor/data/serviço/cliente ATUAIS do agendamento;
+// - se não está mais concluído, remove o lançamento de receita ligado a ele (não deve
+//   contar como receita um agendamento agendado, cancelado ou faltou).
+async function syncApptRevenue(appt){
+  if(!appt || !appt.id) return;
+  const existing = (Store.data.transactions||[]).find(t=>t.appointmentId===appt.id);
+  if(appt.status==='concluido'){
+    const fields = {type:'receita', amount:Number(appt.price)||0, description:`${appt.serviceName} — ${appt.clientName}`, category:'Atendimento', date: appt.date, method: existing?.method||'—', clientId:appt.clientId, clientName:appt.clientName, serviceId:appt.serviceId, serviceName:appt.serviceName, appointmentId:appt.id};
+    if(existing) await Store.update('transactions', existing.id, fields);
+    else await Store.add('transactions', fields);
+  } else if(existing){
+    await Store.remove('transactions', existing.id);
+  }
 }
 
 function openApptForm(existing){
@@ -2779,9 +2793,7 @@ function openApptForm(existing){
         apptId = await Store.add('appointments', payload);
         GCal.syncUpsert({...payload, id:apptId});
       }
-      if(payload.status==='concluido' && !(Store.data.transactions||[]).some(t=>t.appointmentId===apptId)){
-        await Store.add('transactions', {type:'receita', amount:Number(payload.price)||0, description:`${payload.serviceName} — ${payload.clientName}`, category:'Atendimento', date: payload.date||todayISO(), method:'—', clientId:payload.clientId, clientName:payload.clientName, serviceId:payload.serviceId, serviceName:payload.serviceName, appointmentId:apptId});
-      }
+      await syncApptRevenue({...payload, id:apptId});
       showToast(isEdit?'Agendamento atualizado':'Agendamento criado'); closeModal();
     });
   });
