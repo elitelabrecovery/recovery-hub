@@ -2462,6 +2462,7 @@ let agendaSelectedDay=null; // ISO date selected in month view
 let agendaSortField=null; // column key for manual sort in Lista view
 let agendaSortDir='asc'; // 'asc' | 'desc'
 let agendaFilterDate=''; // ISO date filter used in Concluídos/Cancelados
+let agendaClientFilter=''; // id do cliente selecionado no filtro de busca da Lista (todas as abas)
 
 function toISODate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function addDaysISO(dateStr, n){ const d=new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return toISODate(d); }
@@ -2531,6 +2532,7 @@ function renderAgenda(root, actions){
   GCal.onStatusChange = ()=>{ if(currentView==='agenda') renderAgenda(root, actions); };
 
   const {appointments}=Store.data;
+  const clients=Store.data.clients||[];
   const today=todayISO();
 
   const modesHTML = `
@@ -2551,6 +2553,8 @@ else if(agendaFilter==='today') list = list.filter(a=>a.date===today);
 else if(agendaFilter==='done') list = list.filter(a=>a.status==='concluido');
 else if(agendaFilter==='cancel') list = list.filter(a=>a.status==='cancelado'||a.status==='faltou');
 if((agendaFilter==='done'||agendaFilter==='cancel') && agendaFilterDate) list = list.filter(a=>a.date===agendaFilterDate);
+const agendaFilterClientObj = agendaClientFilter ? clients.find(c=>c.id===agendaClientFilter) : null;
+if(agendaFilterClientObj) list = list.filter(a=> a.clientId ? a.clientId===agendaFilterClientObj.id : normalizeSearch(a.clientName)===normalizeSearch(agendaFilterClientObj.name));
 const AGENDA_SORT_FNS = {
 date: (a,b)=> (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')),
 time: (a,b)=> (a.time||'').localeCompare(b.time||''),
@@ -2572,7 +2576,19 @@ exportList = list;
 <button class="tab ${agendaFilter==='done'?'active':''}" data-f="done">Concluídos</button>
 <button class="tab ${agendaFilter==='cancel'?'active':''}" data-f="cancel">Cancelados/Faltas</button>
 </div>
-${(agendaFilter==='done'||agendaFilter==='cancel') ? `<div class="field" style="max-width:220px;margin:12px 16px 0;"><label>Filtrar por data</label><input type="date" id="agenda-date-filter" value="${agendaFilterDate||''}"/></div>` : ''}
+${(()=>{
+  const clientItems = clients.map(c=>({id:c.id, label:c.name}));
+  return `<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin:12px 16px 0;">
+    <div class="field" style="max-width:280px;flex:1;min-width:220px;">
+      <label>Buscar cliente</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        ${searchableSelectHTML('agenda-client-filter', clientItems, agendaClientFilter, 'Digite ou selecione o cliente...')}
+        ${agendaClientFilter ? `<button type="button" class="btn btn-ghost icon-btn" id="agenda-client-filter-clear" title="Limpar filtro de cliente">${icon('close')}</button>` : ''}
+      </div>
+    </div>
+    ${(agendaFilter==='done'||agendaFilter==='cancel') ? `<div class="field" style="max-width:220px;"><label>Filtrar por data</label><input type="date" id="agenda-date-filter" value="${agendaFilterDate||''}"/></div>` : ''}
+  </div>`;
+})()}
 <div class="card" style="margin-top:14px;">
 <div class="card-body tight">
 ${list.length===0 ? `<div class="empty">${icon('agenda')}<p>Nenhum agendamento nesta visão.</p></div>` :
@@ -2680,6 +2696,9 @@ ${list.length===0 ? `<div class="empty">${icon('agenda')}<p>Nenhum agendamento n
     root.querySelectorAll('#agenda-tabs .tab').forEach(t=>t.addEventListener('click', ()=>{ agendaFilter=t.dataset.f; renderAgenda(root,actions); }));
 const agendaDateFilterInput = root.querySelector('#agenda-date-filter');
 if(agendaDateFilterInput) agendaDateFilterInput.addEventListener('change', ()=>{ agendaFilterDate = agendaDateFilterInput.value; renderAgenda(root,actions); });
+wireSearchableSelect(root, 'agenda-client-filter', clients.map(c=>({id:c.id, label:c.name})), item=>{ agendaClientFilter = item.id; renderAgenda(root,actions); });
+const agendaClientFilterClear = root.querySelector('#agenda-client-filter-clear');
+if(agendaClientFilterClear) agendaClientFilterClear.addEventListener('click', ()=>{ agendaClientFilter=''; renderAgenda(root,actions); });
 root.querySelectorAll('.agenda-sort-th').forEach(th=>th.addEventListener('click', ()=>{
 const f = th.dataset.sort;
 if(agendaSortField===f){ agendaSortDir = agendaSortDir==='asc'?'desc':'asc'; } else { agendaSortField = f; agendaSortDir='asc'; }
