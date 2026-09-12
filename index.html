@@ -2481,9 +2481,16 @@ function exportAgendaExcel(list){
   exportToExcel('agenda-elitelab.xlsx', {'Agenda': rows});
 }
 
+function agendaEffectiveSort(){
+  // Na aba Concluídos, se o usuário não escolheu manualmente uma coluna de ordenação,
+  // o padrão é sempre data decrescente (mais recente primeiro).
+  if(agendaSortField===null && agendaFilter==='done') return {field:'date', dir:'desc'};
+  return {field: agendaSortField||'date', dir: agendaSortDir};
+}
 function agendaSortTh(field, label){
-const active = agendaSortField===field;
-const arrow = active ? (agendaSortDir==='asc' ? ' ▲' : ' ▼') : '';
+const {field:effField, dir:effDir} = agendaEffectiveSort();
+const active = effField===field;
+const arrow = active ? (effDir==='asc' ? ' ▲' : ' ▼') : '';
 return `<th class="agenda-sort-th" data-sort="${field}" style="cursor:pointer;user-select:none;white-space:nowrap;" title="Ordenar por ${label}">${label}${arrow}</th>`;
 }
 function apptRowHTML(a, withDate){
@@ -2565,8 +2572,9 @@ status: (a,b)=> (APPT_STATUS[a.status]?.label||'').localeCompare(APPT_STATUS[b.s
 paymentStatus: (a,b)=> (PAY_STATUS[a.paymentStatus||'pendente']?.label||'').localeCompare(PAY_STATUS[b.paymentStatus||'pendente']?.label||''),
 nfseStatus: (a,b)=> (NFSE_STATUS[a.nfseStatus||'pendente']?.label||'').localeCompare(NFSE_STATUS[b.nfseStatus||'pendente']?.label||''),
 };
-const agendaSortFn = AGENDA_SORT_FNS[agendaSortField] || AGENDA_SORT_FNS.date;
-list.sort((a,b)=> agendaSortFn(a,b) * (agendaSortDir==='desc'?-1:1));
+const {field: agendaEffField, dir: agendaEffDir} = agendaEffectiveSort();
+const agendaSortFn = AGENDA_SORT_FNS[agendaEffField] || AGENDA_SORT_FNS.date;
+list.sort((a,b)=> agendaSortFn(a,b) * (agendaEffDir==='desc'?-1:1));
 exportList = list;
 
     bodyHTML = `
