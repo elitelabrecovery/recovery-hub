@@ -3043,13 +3043,16 @@ function openRecurringForm(){
   openModal(`
     <div class="modal-head"><h3>Nova despesa recorrente</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
     <div class="modal-body">
+      <div class="field"><label>Tipo</label>
+        <select id="f-type" disabled><option value="despesa" selected>Despesa</option></select>
+      </div>
       <div class="field"><label>Descrição</label><input id="f-desc" placeholder="Ex: Aluguel da sala, salário, mensalidade do software..."/></div>
       <div class="field-row">
         <div class="field"><label>Valor (R$)</label><input id="f-amount" type="number" min="0" step="0.01"/></div>
         <div class="field"><label>Dia do mês <span class="hint">(1–28)</span></label><input id="f-day" type="number" min="1" max="28" value="5"/></div>
       </div>
       <div class="field"><label>Categoria</label><input id="f-cat" placeholder="Ex: Aluguel, Salários, Software, Material"/></div>
-      <p class="muted" style="font-size:12px;margin:0;">O lançamento de despesa é criado automaticamente todo mês, no dia escolhido, e aparece no Financeiro marcado como "Fixa".</p>
+      <p class="muted" style="font-size:12px;margin:0;">O lançamento de despesa é criado automaticamente todo mês, no dia escolhido, e aparece no Financeiro marcado como "Fixa", seguindo o mesmo padrão de um lançamento comum de despesa.</p>
     </div>
     <div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn btn-primary" id="f-save">${icon('check')}Salvar</button></div>
   `, root=>{
@@ -3107,22 +3110,38 @@ function openTxForm(){
 }
 
 function openTxEditForm(tx){
+const {clients}=Store.data;
+const attachState = { current: tx.attachmentData ? { name: tx.attachmentName, type: tx.attachmentType, dataUrl: tx.attachmentData } : null };
 openModal(`
 <div class="modal-head"><h3>Editar lançamento</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
 <div class="modal-body">
-<div class="field"><label>Descrição</label><div class="muted" style="font-size:13px;">${escapeHtml(tx.description||tx.clientName||'—')}</div></div>
+<div class="field"><label>Tipo</label>
+<select id="f-edit-type"><option value="receita" ${tx.type==='receita'?'selected':''}>Receita</option><option value="despesa" ${tx.type==='despesa'?'selected':''}>Despesa</option></select>
+</div>
+<div class="field"><label>Descrição</label><input id="f-edit-desc" value="${escapeHtml(tx.description||'')}" placeholder="Ex: Aluguel da sala, produto, sessão avulsa..."/></div>
 <div class="field-row">
 <div class="field"><label>Valor (R$)</label><input id="f-edit-amount" type="number" min="0" step="0.01" value="${Number(tx.amount)||0}"/></div>
 <div class="field"><label>Data</label><input id="f-edit-date" type="date" value="${tx.date||todayISO()}"/></div>
 </div>
+<div class="field"><label>Categoria</label><input id="f-edit-cat" value="${escapeHtml(tx.category||'')}" placeholder="Ex: Atendimento, Aluguel, Material, Salário"/></div>
+<div class="field"><label>Cliente vinculado <span class="hint">(opcional, só para receitas)</span></label>
+<select id="f-edit-client"><option value="">Nenhum</option>${clients.map(c=>`<option value="${c.id}" ${tx.clientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
+</div>
+${attachmentFieldHtml(attachState.current)}
 </div>
 <div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn btn-primary" id="f-edit-save">${icon('check')}Salvar</button></div>
 `, root=>{
+wireAttachmentField(root, attachState);
 root.querySelector('#f-edit-save').addEventListener('click', async ()=>{
 const amount=Number(root.querySelector('#f-edit-amount').value);
+const desc=root.querySelector('#f-edit-desc').value.trim();
 const date=root.querySelector('#f-edit-date').value;
+if(!desc || !amount){ showToast('Preencha descrição e valor'); return; }
 if(!date){ showToast('Informe a data'); return; }
-await Store.update('transactions', tx.id, {date, amount});
+const clientId=root.querySelector('#f-edit-client').value;
+const client=clients.find(c=>c.id===clientId);
+const payload = { type:root.querySelector('#f-edit-type').value, description:desc, amount, date, category:root.querySelector('#f-edit-cat').value.trim()||'Geral', clientId:clientId||null, clientName:client?.name||null, attachmentData: attachState.current?attachState.current.dataUrl:null, attachmentName: attachState.current?attachState.current.name:null, attachmentType: attachState.current?attachState.current.type:null };
+await Store.update('transactions', tx.id, payload);
 showToast('Lançamento atualizado'); closeModal();
 });
 });
