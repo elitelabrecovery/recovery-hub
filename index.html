@@ -1356,6 +1356,21 @@ const GCal = {
     catch(e){ console.warn('Google Agenda: falha ao remover evento', e); }
   },
 
+  // Reenvia TODOS os agendamentos já sincronizados (com googleEventId) para o Google Agenda,
+  // reaplicando o formato/duração atuais de apptToEvent — útil depois de mudar o padrão de
+  // título/duração, para atualizar os eventos que já existem no Google (não só os novos).
+  async pushAllExisting(){
+    if(!this.isConnected()) return {total:0, updated:0, failed:0};
+    const appts = (Store.data.appointments||[]).filter(a=>a.googleEventId);
+    let updated=0, failed=0;
+    for(const appt of appts){
+      try{ await this.syncUpsert(appt); updated++; }
+      catch(e){ failed++; }
+      await new Promise(r=>setTimeout(r, 120));
+    }
+    return {total:appts.length, updated, failed};
+  },
+
   _pullRangeISO(){
     const pad=n=>String(n).padStart(2,'0');
     const now = new Date();
@@ -2520,7 +2535,7 @@ function apptRowHTML(a, withDate){
 function renderAgenda(root, actions){
   const gcalOn = GCal.isConnected();
   const lastSync = GCal.lastPullAt ? `${String(GCal.lastPullAt.getHours()).padStart(2,'0')}:${String(GCal.lastPullAt.getMinutes()).padStart(2,'0')}` : null;
-  actions.innerHTML = `<button class="btn ${gcalOn?'':'btn-primary'}" id="btn-gcal">${icon('agenda')}<span>${gcalOn?'Google Agenda conectada':'Conectar Google Agenda'}</span></button>${gcalOn?`<button class="btn" id="btn-gcal-sync" title="Importa agendamentos criados direto no Google Agenda">${icon('agenda')}<span>${GCal.pulling?'Sincronizando...':'Sincronizar agora'}</span></button>`:''}<button class="btn" id="btn-export-agenda">${icon('download')}<span>Exportar Excel</span></button><button class="btn btn-primary" id="btn-new-appt">${icon('plus')}<span>Novo agendamento</span></button>`;
+  actions.innerHTML = `<button class="btn ${gcalOn?'':'btn-primary'}" id="btn-gcal">${icon('agenda')}<span>${gcalOn?'Google Agenda conectada':'Conectar Google Agenda'}</span></button>${gcalOn?`<button class="btn" id="btn-gcal-sync" title="Importa agendamentos criados direto no Google Agenda">${icon('agenda')}<span>${GCal.pulling?'Sincronizando...':'Sincronizar agora'}</span></button>`:''}${gcalOn?`<button class="btn" id="btn-gcal-push-all" title="Reenvia para o Google Agenda todos os agendamentos já sincronizados, com o título e a duração atuais">${icon('agenda')}<span>Atualizar todos no Google</span></button>`:''}<button class="btn" id="btn-export-agenda">${icon('download')}<span>Exportar Excel</span></button><button class="btn btn-primary" id="btn-new-appt">${icon('plus')}<span>Novo agendamento</span></button>`;
   actions.querySelector('#btn-new-appt').addEventListener('click', ()=>openApptForm());
   actions.querySelector('#btn-gcal').addEventListener('click', ()=>{
     if(GCal.isConnected()){
@@ -2539,6 +2554,16 @@ function renderAgenda(root, actions){
     if(r.updated) parts.push(`${r.updated} atualizado(s)`);
     if(r.cancelled) parts.push(`${r.cancelled} cancelado(s)`);
     showToast(parts.length? `Google Agenda: ${parts.join(', ')}` : 'Google Agenda: nada novo para importar');
+    renderAgenda(root, actions);
+  });
+  const pushAllBtn = actions.querySelector('#btn-gcal-push-all');
+  if(pushAllBtn) pushAllBtn.addEventListener('click', async ()=>{
+    const count = (Store.data.appointments||[]).filter(a=>a.googleEventId).length;
+    if(!count){ showToast('Nenhum agendamento sincronizado com o Google Agenda ainda'); return; }
+    if(!confirm(`Atualizar ${count} agendamento(s) já sincronizados no Google Agenda para o padrão atual (Cliente + Serviço + Valor, com a duração real da sessão)?`)) return;
+    pushAllBtn.disabled = true; pushAllBtn.querySelector('span').textContent = 'Atualizando...';
+    const r = await GCal.pushAllExisting();
+    showToast(`Google Agenda: ${r.updated} atualizado(s)${r.failed?`, ${r.failed} falha(s)`:''}`);
     renderAgenda(root, actions);
   });
   GCal.onStatusChange = ()=>{ if(currentView==='agenda') renderAgenda(root, actions); };
