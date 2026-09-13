@@ -2314,9 +2314,11 @@ function openServiceForm(existing){
 
 /* ---------- EVENTOS (participantes captados em eventos, sem vínculo com Clientes) ---------- */
 let eventSearch='';
+let eventSearchTimer=null;
 let eventSort={key:'date', dir:'desc'};
 let currentEventId=null;
 let eventParticipantSearch='';
+let eventParticipantSearchTimer=null;
 let eventParticipantSort={key:'fullName', dir:'asc'};
 
 function eventParticipantsRows(participants){
@@ -2396,7 +2398,7 @@ function renderEvents(root, actions){
     </div>
   `;
   const searchEl = root.querySelector('#event-search');
-  if(searchEl) searchEl.addEventListener('input', e=>{ eventSearch=e.target.value; renderEvents(root,actions); searchEl.focus(); searchEl.selectionStart=searchEl.selectionEnd=searchEl.value.length; });
+  if(searchEl) searchEl.addEventListener('input', e=>{ eventSearch=e.target.value; clearTimeout(eventSearchTimer); eventSearchTimer=setTimeout(()=>{ renderEvents(root,actions); const el=root.querySelector('#event-search'); if(el){ el.focus(); el.selectionStart=el.selectionEnd=el.value.length; } }, 150); });
   bindSortHeaders(root, eventSort, ()=>renderEvents(root,actions));
   root.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click', ()=>{ currentEventId=b.dataset.open; eventParticipantSearch=''; renderView(); }));
   root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openEventForm(events.find(e=>e.id===b.dataset.edit))));
@@ -2491,7 +2493,7 @@ function renderEventDetail(root, actions){
   `;
   root.querySelector('#btn-back-events').addEventListener('click', ()=>{ currentEventId=null; renderView(); });
   const searchEl = root.querySelector('#participant-search');
-  if(searchEl) searchEl.addEventListener('input', e=>{ eventParticipantSearch=e.target.value; renderView(); searchEl.focus(); searchEl.selectionStart=searchEl.selectionEnd=searchEl.value.length; });
+  if(searchEl) searchEl.addEventListener('input', e=>{ eventParticipantSearch=e.target.value; clearTimeout(eventParticipantSearchTimer); eventParticipantSearchTimer=setTimeout(()=>{ renderView(); const el=root.querySelector('#participant-search'); if(el){ el.focus(); el.selectionStart=el.selectionEnd=el.value.length; } }, 150); });
   bindSortHeaders(root, eventParticipantSort, ()=>renderView());
   root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openParticipantForm(ev.id, all.find(p=>p.id===b.dataset.edit))));
   root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
