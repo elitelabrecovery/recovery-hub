@@ -1287,17 +1287,25 @@ const GCal = {
     this._loadToken();
     if(this.token) return this.token;
     if(this.isConnected() && this.tokenClient){
-      await new Promise(resolve=>{
-        const prevCb = this.tokenClient.callback;
-        this.tokenClient.callback = (resp)=>{
-          this.tokenClient.callback = prevCb;
-          if(resp && resp.access_token) this._saveToken(resp.access_token, resp.expires_in);
-          if(prevCb) prevCb(resp);
-          resolve();
-        };
-        try{ this.tokenClient.requestAccessToken({prompt:''}); }catch(e){ resolve(); }
-        setTimeout(resolve, 2500);
-      });
+      // Serializa chamadas concorrentes: se já existe uma renovação de token em andamento,
+      // toda chamada nova espera a MESMA promise em vez de sobrescrever
+      // this.tokenClient.callback por cima da anterior — isso causava corrida e falha
+      // intermitente de sincronização com o Google Agenda quando dois salvamentos/edições
+      // (ou o pullSync automático) pediam token quase ao mesmo tempo.
+      if(!this._tokenPromise){
+        this._tokenPromise = new Promise(resolve=>{
+          const prevCb = this.tokenClient.callback;
+          this.tokenClient.callback = (resp)=>{
+            this.tokenClient.callback = prevCb;
+            if(resp && resp.access_token) this._saveToken(resp.access_token, resp.expires_in);
+            if(prevCb) prevCb(resp);
+            resolve();
+          };
+          try{ this.tokenClient.requestAccessToken({prompt:''}); }catch(e){ resolve(); }
+          setTimeout(resolve, 4000);
+        }).finally(()=>{ this._tokenPromise = null; });
+      }
+      await this._tokenPromise;
       this._loadToken();
     }
     return this.token;
@@ -1335,29 +1343,47 @@ const GCal = {
   },
 
   async syncUpsert(appt){
-    if(!this.isConnected() || !appt) return;
+    if(!this.isConnected() || !appt) return false;
     try{
       const event = this.apptToEvent(appt);
       if(appt.googleEventId){
-        const res = await this._apiFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${appt.googleEventId}`, {method:'PATCH', body: JSON.stringify(event)});
-        if(res && res.ok) return;
-        if(res && res.status!==404) return; // some other error, don't duplicate
+        let res = await this._apiFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${appt.googleEventId}`, {method:'PATCH', body: JSON.stringify(event)});
+        if(res && res.ok) return true;
+        if(!(res && res.status===404)){
+          // falha transitória (rede, token expirado, 5xx etc.) — 1 nova tentativa antes de desistir
+          await new Promise(r=>setTimeout(r, 900));
+          res = await this._apiFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${appt.googleEventId}`, {method:'PATCH', body: JSON.stringify(event)});
+          if(res && res.ok) return true;
+          if(!(res && res.status===404)) return false; // ainda falhando e não é 404 (evento apagado no Google): desiste sem duplicar
+        }
       }
-      const res2 = await this._apiFetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {method:'POST', body: JSON.stringify(event)});
+      let res2 = await this._apiFetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {method:'POST', body: JSON.stringify(event)});
+      if(!res2 || !res2.ok){
+        await new Promise(r=>setTimeout(r, 900));
+        res2 = await this._apiFetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {method:'POST', body: JSON.stringify(event)});
+      }
       if(res2 && res2.ok){
         const data = await res2.json();
         if(data && data.id) await Store.update('appointments', appt.id, {googleEventId: data.id});
+        return true;
       }
-    }catch(e){ console.warn('Google Agenda: falha ao sincronizar evento', e); }
+      return false;
+    }catch(e){ console.warn('Google Agenda: falha ao sincronizar evento', e); return false; }
   },
 
   async syncDelete(appt){
-    if(!this.isConnected() || !appt || !appt.googleEventId) return;
-    try{ await this._apiFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${appt.googleEventId}`, {method:'DELETE'}); }
-    catch(e){ console.warn('Google Agenda: falha ao remover evento', e); }
+    if(!this.isConnected() || !appt || !appt.googleEventId) return false;
+    try{
+      let res = await this._apiFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${appt.googleEventId}`, {method:'DELETE'});
+      if(res && (res.ok || res.status===404 || res.status===410)) return true;
+      await new Promise(r=>setTimeout(r, 900));
+      res = await this._apiFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${appt.googleEventId}`, {method:'DELETE'});
+      return !!(res && (res.ok || res.status===404 || res.status===410));
+    }
+    catch(e){ console.warn('Google Agenda: falha ao remover evento', e); return false; }
   },
 
-  // Reenvia TODOS os agendamentos já sincronizados (com googleEventId) para o Google Agenda,
+    // Reenvia TODOS os agendamentos já sincronizados (com googleEventId) para o Google Agenda,
   // reaplicando o formato/duração atuais de apptToEvent — útil depois de mudar o padrão de
   // título/duração, para atualizar os eventos que já existem no Google (não só os novos).
   async pushAllExisting(){
@@ -3032,8 +3058,11 @@ renderAgenda(root,actions);
   root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
     if(confirm('Remover este agendamento?')){
       const appt = appointments.find(a=>a.id===b.dataset.del);
-      if(appt) GCal.syncDelete(appt);
-      Store.remove('appointments', b.dataset.del); showToast('Agendamento removido');
+      (async ()=>{
+        if(appt) await GCal.syncDelete(appt);
+        await Store.remove('appointments', b.dataset.del);
+        showToast('Agendamento removido');
+      })();
     }
   }));
   root.querySelectorAll('[data-done]').forEach(b=>b.addEventListener('click', ()=>completeAppointment(appointments.find(a=>a.id===b.dataset.done))));
@@ -3054,8 +3083,8 @@ async function completeAppointment(appt){
   if(!confirm('Marcar este agendamento como concluído?\nO pagamento será registrado automaticamente como PAGO e lançado no Financeiro como receita, na data do agendamento.')) return;
   await Store.update('appointments', appt.id, {status:'concluido', paymentStatus:'pago'});
   await syncApptRevenue({...appt, status:'concluido'});
-  GCal.syncUpsert({...appt, status:'concluido'});
-  showToast('Agendamento concluído e pago');
+  const gcalOk = await GCal.syncUpsert({...appt, status:'concluido'});
+  showToast((gcalOk===false && GCal.isConnected()) ? 'Agendamento concluído e pago — falha ao sincronizar com o Google Agenda, será tentado de novo na próxima edição' : 'Agendamento concluído e pago');
 }
 
 // Mantém o lançamento de receita do Financeiro sincronizado com um agendamento:
@@ -3129,15 +3158,16 @@ function openApptForm(existing){
       const status=root.querySelector('#f-status').value;
       const payload={ clientId, clientName:client?.name||'', serviceId, serviceName:service?.name||'', date:root.querySelector('#f-date').value||todayISO(), time:root.querySelector('#f-time').value, duration:Number(root.querySelector('#f-duration').value)||service?.duration||50, price:Number(root.querySelector('#f-price').value)||0, status, notes:root.querySelector('#f-notes').value.trim(), paymentStatus: status==='concluido' ? 'pago' : (existing?.paymentStatus||'pendente'), nfseStatus:root.querySelector('#f-nfse').value, ...(existing?.gcalSource==='google'?{needsReview:false}:{}) };
       let apptId = existing?.id;
+      let gcalOk = true;
       if(isEdit){
         await Store.update('appointments', existing.id, payload);
-        GCal.syncUpsert({...existing, ...payload, id:existing.id});
+        gcalOk = await GCal.syncUpsert({...existing, ...payload, id:existing.id});
       } else {
         apptId = await Store.add('appointments', payload);
-        GCal.syncUpsert({...payload, id:apptId});
+        gcalOk = await GCal.syncUpsert({...payload, id:apptId});
       }
       await syncApptRevenue({...payload, id:apptId});
-      showToast(isEdit?'Agendamento atualizado':'Agendamento criado'); closeModal();
+      showToast((gcalOk===false && GCal.isConnected()) ? (isEdit?'Agendamento atualizado — falha ao sincronizar com o Google Agenda, será tentado de novo na próxima edição':'Agendamento criado — falha ao sincronizar com o Google Agenda, será tentado de novo na próxima edição') : (isEdit?'Agendamento atualizado':'Agendamento criado')); closeModal();
     });
   });
 }
