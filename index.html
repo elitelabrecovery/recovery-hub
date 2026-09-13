@@ -2317,13 +2317,45 @@ let eventSearch='';
 let eventSort={key:'date', dir:'desc'};
 let currentEventId=null;
 let eventParticipantSearch='';
+let eventParticipantSort={key:'fullName', dir:'asc'};
+
+function eventParticipantsRows(participants){
+  return participants.map(p=>{
+    const services = (p.services||[]).map(s=> `${s.serviceName||''} · ${s.paymentType==='pago'?'Pago':'Gratuito'}`).join(', ');
+    return {
+      'Nome': p.fullName||'', 'Telefone': p.phone||'', 'Instagram': p.instagram?('@'+p.instagram):'',
+      'Último contato': p.lastContactDate?fmtDate(p.lastContactDate):'', 'Serviço(s) realizado(s)': services
+    };
+  });
+}
+function exportEventParticipantsExcel(ev){
+  const participants = Store.data.eventParticipants.filter(p=>p.eventId===ev.id).slice().sort((a,b)=>(a.fullName||'').localeCompare(b.fullName||'','pt-BR',{sensitivity:'base'}));
+  const rows = eventParticipantsRows(participants);
+  const safeName = (ev.name||'evento').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'evento';
+  exportToExcel(`evento-${safeName}-participantes.xlsx`, {[(ev.name||'Evento').slice(0,31)]: rows});
+}
+function exportAllEventsExcel(){
+  const { events, eventParticipants } = Store.data;
+  if(!events.length){ showToast('Nenhum evento cadastrado ainda'); return; }
+  const sheets = {};
+  events.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(ev=>{
+    const participants = eventParticipants.filter(p=>p.eventId===ev.id).slice().sort((a,b)=>(a.fullName||'').localeCompare(b.fullName||'','pt-BR',{sensitivity:'base'}));
+    const rows = eventParticipantsRows(participants);
+    let sheetName = (ev.name||'Evento').slice(0,31) || 'Evento';
+    let i=2;
+    while(sheets[sheetName]){ sheetName = (ev.name||'Evento').slice(0,28)+'-'+i; i++; }
+    sheets[sheetName] = rows;
+  });
+  exportToExcel('eventos-participantes.xlsx', sheets);
+}
 
 function renderEvents(root, actions){
   if(currentEventId && !Store.data.events.find(e=>e.id===currentEventId)){ currentEventId=null; }
   if(currentEventId){ renderEventDetail(root, actions); return; }
 
-  actions.innerHTML = `<button class="btn btn-primary" id="btn-new-event">${icon('plus')}<span>Novo evento</span></button>`;
+  actions.innerHTML = `<button class="btn" id="btn-export-all-events">${icon('download')}<span>Exportar Excel</span></button><button class="btn btn-primary" id="btn-new-event">${icon('plus')}<span>Novo evento</span></button>`;
   actions.querySelector('#btn-new-event').addEventListener('click', ()=>openEventForm());
+  actions.querySelector('#btn-export-all-events').addEventListener('click', exportAllEventsExcel);
 
   const { events, eventParticipants } = Store.data;
   const q = normalizeSearch(eventSearch);
@@ -2404,13 +2436,21 @@ function openEventForm(existing){
 
 function renderEventDetail(root, actions){
   const ev = Store.data.events.find(e=>e.id===currentEventId);
-  actions.innerHTML = `<button class="btn btn-primary" id="btn-new-participant">${icon('plus')}<span>Novo participante</span></button>`;
+  actions.innerHTML = `<button class="btn" id="btn-export-event">${icon('download')}<span>Exportar Excel</span></button><button class="btn btn-primary" id="btn-new-participant">${icon('plus')}<span>Novo participante</span></button>`;
   actions.querySelector('#btn-new-participant').addEventListener('click', ()=>openParticipantForm(ev.id));
+  actions.querySelector('#btn-export-event').addEventListener('click', ()=>exportEventParticipantsExcel(ev));
 
   const q = normalizeSearch(eventParticipantSearch);
   const all = Store.data.eventParticipants.filter(p=>p.eventId===ev.id);
   const list = all.filter(p=> !q || normalizeSearch(p.fullName).includes(q) || normalizeSearch(p.phone).includes(q));
-  list.sort((a,b)=> (a.fullName||'').localeCompare(b.fullName||'','pt-BR',{sensitivity:'base'}));
+  const PARTICIPANT_SORT_VALUE = {
+    fullName: p=> p.fullName||'',
+    phone: p=> p.phone||'',
+    instagram: p=> p.instagram||'',
+    lastContactDate: p=> p.lastContactDate||'',
+    services: p=> (p.services||[]).map(s=>s.serviceName).join(', ')||''
+  };
+  list.sort((a,b)=> compareBy(eventParticipantSort.dir, PARTICIPANT_SORT_VALUE[eventParticipantSort.key](a), PARTICIPANT_SORT_VALUE[eventParticipantSort.key](b)));
 
   root.innerHTML = `
     <button class="btn btn-ghost" id="btn-back-events" style="margin-bottom:12px;">&larr; Voltar para Eventos</button>
@@ -2429,7 +2469,7 @@ function renderEventDetail(root, actions){
         ${all.length===0 ? `<div class="empty">${icon('users')}<p>Nenhum participante cadastrado neste evento ainda.</p></div>` :
         list.length===0 ? `<div class="empty">${icon('search')}<p>Nenhum participante encontrado para "${escapeHtml(eventParticipantSearch)}".</p></div>` :
         `<div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>Telefone</th><th>Instagram</th><th>Último contato</th><th>Serviço(s) realizado(s)</th><th></th></tr></thead>
+          <thead><tr>${thSort('Nome','fullName',eventParticipantSort)}${thSort('Telefone','phone',eventParticipantSort)}${thSort('Instagram','instagram',eventParticipantSort)}${thSort('Último contato','lastContactDate',eventParticipantSort)}${thSort('Serviço(s) realizado(s)','services',eventParticipantSort)}<th></th></tr></thead>
           <tbody>${list.map(p=>{
             const services = (p.services||[]).map(s=> `<span class="badge ${s.paymentType==='pago'?'good':'muted'}">${escapeHtml(s.serviceName||'—')} · ${s.paymentType==='pago'?'Pago':'Gratuito'}</span>`).join(' ');
             const handle = (p.instagram||'').replace(/^@/,'');
@@ -2452,6 +2492,7 @@ function renderEventDetail(root, actions){
   root.querySelector('#btn-back-events').addEventListener('click', ()=>{ currentEventId=null; renderView(); });
   const searchEl = root.querySelector('#participant-search');
   if(searchEl) searchEl.addEventListener('input', e=>{ eventParticipantSearch=e.target.value; renderView(); searchEl.focus(); searchEl.selectionStart=searchEl.selectionEnd=searchEl.value.length; });
+  bindSortHeaders(root, eventParticipantSort, ()=>renderView());
   root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openParticipantForm(ev.id, all.find(p=>p.id===b.dataset.edit))));
   root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
     if(confirm('Remover este participante do evento? Essa ação não pode ser desfeita.')){ Store.remove('eventParticipants', b.dataset.del); showToast('Participante removido'); }
