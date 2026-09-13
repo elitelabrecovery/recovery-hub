@@ -681,6 +681,7 @@ const ICONS = {
   settings:'<circle cx="12" cy="12" r="3" stroke-width="1.6"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1h-.2a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 6.9 2.6l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.6v-.2a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6h.1a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.6 1h.2a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1Z" stroke-width="1.2" stroke-linejoin="round"/>',
   camera:'<path d="M4 8h3.2l1.6-2h6.4l1.6 2H20a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.4" stroke-width="1.7"/>',
   image:'<rect x="3" y="4" width="18" height="16" rx="2" stroke-width="1.7"/><circle cx="8.5" cy="9.5" r="1.6" stroke-width="1.7"/><path d="M21 16.5l-5.6-5.6a1 1 0 0 0-1.4 0L9 16" stroke-width="1.7" stroke-linejoin="round"/>',
+  events:'<rect x="3.5" y="4.5" width="17" height="16" rx="2.5" stroke-width="1.7"/><path d="M8 2.8v3.4M16 2.8v3.4M3.5 9.5h17" stroke-width="1.7" stroke-linecap="round"/><path d="M12 12.3v6.2M12 12.3l3 1.6-3 1.6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 function icon(name,cls){ return `<svg class="${cls||''}" viewBox="0 0 24 24">${ICONS[name]||''}</svg>`; }
 
@@ -1112,7 +1113,7 @@ const CLIENT_TIERS = { ouro:{label:'Ouro',cls:'tier-ouro'}, prata:{label:'Prata'
 const Store = {
   mode:'connecting', // 'firebase' | 'local'
   db:null,
-  data:{ clients:[], services:[], appointments:[], transactions:[], recurringExpenses:[], assessments:[], settings:[], bankAccounts:[], bankAccountHistory:[], bankAccountTotalHistory:[] },
+  data:{ clients:[], services:[], appointments:[], transactions:[], recurringExpenses:[], assessments:[], settings:[], bankAccounts:[], bankAccountHistory:[], bankAccountTotalHistory:[], events:[], eventParticipants:[] },
   apptsLoaded:false, // true assim que a 1ª foto do Firestore de "appointments" chega (evita corrida com o GCal)
   listeners:[],
   onChange(cb){ this.listeners.push(cb); },
@@ -1124,7 +1125,7 @@ const Store = {
     if(typeof firebaseDb!=='undefined' && firebaseDb){
       this.db=firebaseDb; this.mode='firebase';
       setSyncPill('firebase');
-      ['clients','services','appointments','transactions','recurringExpenses','assessments','settings','bankAccounts','bankAccountHistory','bankAccountTotalHistory'].forEach(coll=>{
+      ['clients','services','appointments','transactions','recurringExpenses','assessments','settings','bankAccounts','bankAccountHistory','bankAccountTotalHistory','events','eventParticipants'].forEach(coll=>{
         this.db.collection(coll).onSnapshot(snap=>{
           this.data[coll]=snap.docs.map(d=>({id:d.id,...d.data()}));
           if(coll==='appointments') this.apptsLoaded = true;
@@ -1838,6 +1839,7 @@ const VIEWS = [
   {id:'assessments', label:'Avaliações', icon:'assess'},
   {id:'clients', label:'Clientes', icon:'clients'},
   {id:'accounts', label:'Contas', icon:'cash'},
+  {id:'events', label:'Eventos', icon:'events'},
   {id:'finance', label:'Financeiro', icon:'finance'},
   {id:'ranking', label:'Rankings', icon:'ranking'},
   {id:'services', label:'Serviços', icon:'services'},
@@ -1871,6 +1873,7 @@ const VIEW_META = {
   assessments:{title:'Avaliações', sub:'Histórico físico e evolução dos clientes'},
   accounts:{title:'Contas', sub:'Saldos bancários cadastrados manualmente (não afeta o Financeiro)'},
   users:{title:'Usuários', sub:'Contas de acesso da equipe, bloqueios e permissões'},
+  events:{title:'Eventos', sub:'Participantes captados em eventos, sem vínculo com o cadastro de clientes'},
 };
 
 function renderView(){
@@ -1891,6 +1894,7 @@ function renderView(){
   else if(currentView==='assessments') renderAssessments(root,actions);
   else if(currentView==='accounts') renderAccounts(root,actions);
   else if(currentView==='users') renderUsers(root,actions);
+  else if(currentView==='events') renderEvents(root,actions);
 }
 
 /* ---------- MODAL HELPERS ---------- */
@@ -2308,6 +2312,234 @@ function openServiceForm(existing){
   });
 }
 
+/* ---------- EVENTOS (participantes captados em eventos, sem vínculo com Clientes) ---------- */
+let eventSearch='';
+let eventSort={key:'date', dir:'desc'};
+let currentEventId=null;
+let eventParticipantSearch='';
+
+function renderEvents(root, actions){
+  if(currentEventId && !Store.data.events.find(e=>e.id===currentEventId)){ currentEventId=null; }
+  if(currentEventId){ renderEventDetail(root, actions); return; }
+
+  actions.innerHTML = `<button class="btn btn-primary" id="btn-new-event">${icon('plus')}<span>Novo evento</span></button>`;
+  actions.querySelector('#btn-new-event').addEventListener('click', ()=>openEventForm());
+
+  const { events, eventParticipants } = Store.data;
+  const q = normalizeSearch(eventSearch);
+  const list = events.filter(e=> !q || normalizeSearch(e.name).includes(q));
+  const EVENT_SORT_VALUE = {
+    name: e=> e.name||'',
+    date: e=> e.date||'',
+    count: e=> eventParticipants.filter(p=>p.eventId===e.id).length,
+  };
+  const sorted = [...list].sort((a,b)=> compareBy(eventSort.dir, EVENT_SORT_VALUE[eventSort.key](a), EVENT_SORT_VALUE[eventSort.key](b)));
+
+  root.innerHTML = `
+    <div class="filter-bar">
+      <div class="search-input">${icon('search')}<input id="event-search" placeholder="Buscar evento por nome" value="${escapeHtml(eventSearch)}"/></div>
+      <span class="muted" style="font-size:12.5px;">${sorted.length} de ${events.length} evento(s)</span>
+    </div>
+    <div class="card">
+      <div class="card-body tight">
+        ${events.length===0 ? `<div class="empty">${icon('events')}<p>Nenhum evento cadastrado ainda.</p></div>` :
+        sorted.length===0 ? `<div class="empty">${icon('search')}<p>Nenhum evento encontrado para "${escapeHtml(eventSearch)}".</p></div>` :
+        `<div class="table-wrap"><table>
+          <thead><tr>${thSort('Evento','name',eventSort)}${thSort('Data','date',eventSort)}${thSort('Participantes','count',eventSort)}<th></th></tr></thead>
+          <tbody>${sorted.map(e=>{
+            const count = eventParticipants.filter(p=>p.eventId===e.id).length;
+            return `<tr>
+              <td class="cell-strong">${escapeHtml(e.name)}</td>
+              <td>${fmtDate(e.date)}</td>
+              <td class="tnum">${count}</td>
+              <td><div class="row-actions">
+                <button class="btn btn-ghost icon-btn" data-open="${e.id}" title="Ver participantes">${icon('search')}</button>
+                <button class="btn btn-ghost icon-btn" data-edit="${e.id}" title="Editar evento">${icon('edit')}</button>
+                <button class="btn btn-ghost icon-btn btn-danger" data-del="${e.id}" title="Excluir evento">${icon('trash')}</button>
+              </div></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+  `;
+  const searchEl = root.querySelector('#event-search');
+  if(searchEl) searchEl.addEventListener('input', e=>{ eventSearch=e.target.value; renderEvents(root,actions); searchEl.focus(); searchEl.selectionStart=searchEl.selectionEnd=searchEl.value.length; });
+  bindSortHeaders(root, eventSort, ()=>renderEvents(root,actions));
+  root.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click', ()=>{ currentEventId=b.dataset.open; eventParticipantSearch=''; renderView(); }));
+  root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openEventForm(events.find(e=>e.id===b.dataset.edit))));
+  root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
+    const evId=b.dataset.del;
+    const count = eventParticipants.filter(p=>p.eventId===evId).length;
+    const msg = count>0 ? `Excluir este evento e os ${count} participante(s) cadastrados nele? Essa ação não pode ser desfeita.` : 'Excluir este evento? Essa ação não pode ser desfeita.';
+    if(confirm(msg)){
+      eventParticipants.filter(p=>p.eventId===evId).forEach(p=> Store.remove('eventParticipants', p.id));
+      Store.remove('events', evId);
+      showToast('Evento removido');
+    }
+  }));
+}
+
+function openEventForm(existing){
+  const isEdit=!!existing;
+  openModal(`
+    <div class="modal-head"><h3>${isEdit?'Editar evento':'Novo evento'}</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome do evento</label><input id="f-ev-name" value="${escapeHtml(existing?.name||'')}" placeholder="Ex: Feira de Saúde Centro"/></div>
+      <div class="field"><label>Data do evento</label><input id="f-ev-date" type="date" value="${existing?.date||todayISO()}"/></div>
+    </div>
+    <div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn btn-primary" id="f-save">${icon('check')}Salvar</button></div>
+  `, root=>{
+    root.querySelector('#f-save').addEventListener('click', async ()=>{
+      const name = root.querySelector('#f-ev-name').value.trim();
+      const date = root.querySelector('#f-ev-date').value;
+      if(!name){ showToast('Informe o nome do evento'); return; }
+      if(!date){ showToast('Informe a data do evento'); return; }
+      const payload={ name, date };
+      if(isEdit) await Store.update('events', existing.id, payload); else await Store.add('events', payload);
+      showToast(isEdit?'Evento atualizado':'Evento cadastrado'); closeModal(); renderView();
+    });
+  });
+}
+
+function renderEventDetail(root, actions){
+  const ev = Store.data.events.find(e=>e.id===currentEventId);
+  actions.innerHTML = `<button class="btn btn-primary" id="btn-new-participant">${icon('plus')}<span>Novo participante</span></button>`;
+  actions.querySelector('#btn-new-participant').addEventListener('click', ()=>openParticipantForm(ev.id));
+
+  const q = normalizeSearch(eventParticipantSearch);
+  const all = Store.data.eventParticipants.filter(p=>p.eventId===ev.id);
+  const list = all.filter(p=> !q || normalizeSearch(p.fullName).includes(q) || normalizeSearch(p.phone).includes(q));
+  list.sort((a,b)=> (a.fullName||'').localeCompare(b.fullName||'','pt-BR',{sensitivity:'base'}));
+
+  root.innerHTML = `
+    <button class="btn btn-ghost" id="btn-back-events" style="margin-bottom:12px;">&larr; Voltar para Eventos</button>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-body">
+        <h3 style="margin:0 0 4px;">${escapeHtml(ev.name)}</h3>
+        <p class="muted" style="margin:0;font-size:13px;">${fmtDate(ev.date)}</p>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <div class="search-input">${icon('search')}<input id="participant-search" placeholder="Buscar por nome ou telefone" value="${escapeHtml(eventParticipantSearch)}"/></div>
+      <span class="muted" style="font-size:12.5px;">${list.length} de ${all.length} participante(s)</span>
+    </div>
+    <div class="card">
+      <div class="card-body tight">
+        ${all.length===0 ? `<div class="empty">${icon('users')}<p>Nenhum participante cadastrado neste evento ainda.</p></div>` :
+        list.length===0 ? `<div class="empty">${icon('search')}<p>Nenhum participante encontrado para "${escapeHtml(eventParticipantSearch)}".</p></div>` :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Nome</th><th>Telefone</th><th>Instagram</th><th>Último contato</th><th>Serviço(s) realizado(s)</th><th></th></tr></thead>
+          <tbody>${list.map(p=>{
+            const services = (p.services||[]).map(s=> `<span class="badge ${s.paymentType==='pago'?'good':'muted'}">${escapeHtml(s.serviceName||'—')} · ${s.paymentType==='pago'?'Pago':'Gratuito'}</span>`).join(' ');
+            const handle = (p.instagram||'').replace(/^@/,'');
+            return `<tr>
+              <td class="cell-strong">${escapeHtml(p.fullName)}</td>
+              <td>${escapeHtml(p.phone||'—')}</td>
+              <td>${handle ? `<a href="https://instagram.com/${escapeHtml(handle)}" target="_blank" rel="noopener">@${escapeHtml(handle)}</a>` : '—'}</td>
+              <td>${p.lastContactDate ? fmtDate(p.lastContactDate) : '—'}</td>
+              <td>${services || '<span class="muted">—</span>'}</td>
+              <td><div class="row-actions">
+                <button class="btn btn-ghost icon-btn" data-edit="${p.id}" title="Editar participante">${icon('edit')}</button>
+                <button class="btn btn-ghost icon-btn btn-danger" data-del="${p.id}" title="Excluir participante">${icon('trash')}</button>
+              </div></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+  `;
+  root.querySelector('#btn-back-events').addEventListener('click', ()=>{ currentEventId=null; renderView(); });
+  const searchEl = root.querySelector('#participant-search');
+  if(searchEl) searchEl.addEventListener('input', e=>{ eventParticipantSearch=e.target.value; renderView(); searchEl.focus(); searchEl.selectionStart=searchEl.selectionEnd=searchEl.value.length; });
+  root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openParticipantForm(ev.id, all.find(p=>p.id===b.dataset.edit))));
+  root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
+    if(confirm('Remover este participante do evento? Essa ação não pode ser desfeita.')){ Store.remove('eventParticipants', b.dataset.del); showToast('Participante removido'); }
+  }));
+}
+
+function openParticipantForm(eventId, existing){
+  const isEdit=!!existing;
+  const svcCatalog = Store.data.services.filter(s=>s.active!==false).sort((a,b)=>(a.name||'').localeCompare(b.name||'','pt-BR',{sensitivity:'base'}));
+  let rows = (existing && existing.services && existing.services.length) ? existing.services.map(s=>({serviceId:s.serviceId||'', paymentType:s.paymentType==='gratuito'?'gratuito':'pago'})) : [{serviceId:'', paymentType:'pago'}];
+
+  function serviceOptionsHtml(selectedId){
+    return `<option value="">Selecione um serviço...</option>` + svcCatalog.map(s=>`<option value="${s.id}" ${s.id===selectedId?'selected':''}>${escapeHtml(s.name)}</option>`).join('');
+  }
+  function rowHtml(row, idx){
+    return `<div class="ev-svc-row" data-row="${idx}" style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;">
+      <div class="field" style="flex:2;margin:0;"><label>${idx===0?'Serviço realizado':''}</label>
+        <select class="f-ev-svc" data-idx="${idx}">${serviceOptionsHtml(row.serviceId)}</select>
+      </div>
+      <div class="field" style="flex:1;margin:0;"><label>${idx===0?'Tipo':''}</label>
+        <select class="f-ev-pay" data-idx="${idx}">
+          <option value="pago" ${row.paymentType==='pago'?'selected':''}>Pago</option>
+          <option value="gratuito" ${row.paymentType==='gratuito'?'selected':''}>Gratuito</option>
+        </select>
+      </div>
+      <button type="button" class="btn btn-ghost icon-btn btn-danger f-ev-rm" data-idx="${idx}" title="Remover serviço">${icon('trash')}</button>
+    </div>`;
+  }
+
+  openModal(`
+    <div class="modal-head"><h3>${isEdit?'Editar participante':'Novo participante'}</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome completo</label><input id="f-ev-name-p" value="${escapeHtml(existing?.fullName||'')}" placeholder="Nome completo do participante"/></div>
+      <div class="field-row">
+        <div class="field"><label>Telefone</label><input id="f-ev-phone" value="${escapeHtml(existing?.phone||'')}" placeholder="(00) 00000-0000"/></div>
+        <div class="field"><label>Instagram</label><input id="f-ev-insta" value="${escapeHtml(existing?.instagram||'')}" placeholder="@usuario"/></div>
+      </div>
+      <div class="field"><label>Data do último contato após o evento</label><input id="f-ev-contact" type="date" value="${existing?.lastContactDate||''}"/></div>
+      <div id="f-ev-rows">${rows.map((r,i)=>rowHtml(r,i)).join('')}</div>
+      <button type="button" class="btn btn-ghost" id="f-ev-add-row">${icon('plus')}<span>Adicionar serviço</span></button>
+    </div>
+    <div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn btn-primary" id="f-save">${icon('check')}Salvar</button></div>
+  `, root=>{
+    const rowsWrap = root.querySelector('#f-ev-rows');
+    function syncFromDom(){
+      rowsWrap.querySelectorAll('[data-row]').forEach(rowEl=>{
+        const idx = Number(rowEl.dataset.row);
+        const svc = rowEl.querySelector('.f-ev-svc').value;
+        const pay = rowEl.querySelector('.f-ev-pay').value;
+        rows[idx] = { serviceId:svc, paymentType:pay };
+      });
+    }
+    function wireRows(){
+      rowsWrap.querySelectorAll('.f-ev-rm').forEach(btn=> btn.addEventListener('click', ()=>{
+        syncFromDom();
+        const idx=Number(btn.dataset.idx);
+        if(rows.length<=1){ rows=[{serviceId:'', paymentType:'pago'}]; } else { rows.splice(idx,1); }
+        rerenderRows();
+      }));
+    }
+    function rerenderRows(){
+      rowsWrap.innerHTML = rows.map((r,i)=>rowHtml(r,i)).join('');
+      wireRows();
+    }
+    wireRows();
+    root.querySelector('#f-ev-add-row').addEventListener('click', ()=>{
+      syncFromDom();
+      rows.push({serviceId:'', paymentType:'pago'});
+      rerenderRows();
+    });
+    root.querySelector('#f-save').addEventListener('click', async ()=>{
+      syncFromDom();
+      const fullName = root.querySelector('#f-ev-name-p').value.trim();
+      if(!fullName){ showToast('Informe o nome completo do participante'); return; }
+      const phone = root.querySelector('#f-ev-phone').value.trim();
+      const instagram = root.querySelector('#f-ev-insta').value.trim().replace(/^@/,'');
+      const lastContactDate = root.querySelector('#f-ev-contact').value || null;
+      const svcList = rows.filter(r=>r.serviceId).map(r=>{
+        const svc = svcCatalog.find(s=>s.id===r.serviceId);
+        return { serviceId:r.serviceId, serviceName: svc?svc.name:'', paymentType: r.paymentType==='gratuito'?'gratuito':'pago' };
+      });
+      const payload = { eventId, fullName, phone, instagram, lastContactDate, services: svcList };
+      if(isEdit) await Store.update('eventParticipants', existing.id, payload); else await Store.add('eventParticipants', payload);
+      showToast(isEdit?'Participante atualizado':'Participante cadastrado'); closeModal(); renderView();
+    });
+  });
+}
+
 /* ---------- ACCOUNTS (independente do Financeiro) ---------- */
 let accountSort = {key:'bank', dir:'asc'};
 let accountsChartKey = 'total';
@@ -2535,7 +2767,7 @@ function apptRowHTML(a, withDate){
 function renderAgenda(root, actions){
   const gcalOn = GCal.isConnected();
   const lastSync = GCal.lastPullAt ? `${String(GCal.lastPullAt.getHours()).padStart(2,'0')}:${String(GCal.lastPullAt.getMinutes()).padStart(2,'0')}` : null;
-  actions.innerHTML = `<button class="btn ${gcalOn?'':'btn-primary'}" id="btn-gcal">${icon('agenda')}<span>${gcalOn?'Google Agenda conectada':'Conectar Google Agenda'}</span></button>${gcalOn?`<button class="btn" id="btn-gcal-sync" title="Importa agendamentos criados direto no Google Agenda">${icon('agenda')}<span>${GCal.pulling?'Sincronizando...':'Sincronizar agora'}</span></button>`:''}<button class="btn" id="btn-export-agenda">${icon('download')}<span>Exportar Excel</span></button><button class="btn btn-primary" id="btn-new-appt">${icon('plus')}<span>Novo agendamento</span></button>`;
+  actions.innerHTML = `<button class="btn ${gcalOn?'':'btn-primary'}" id="btn-gcal">${icon('agenda')}<span>${gcalOn?'Google Agenda conectada':'Conectar Google Agenda'}</span></button>${gcalOn?`<button class="btn" id="btn-gcal-sync" title="Importa agendamentos criados direto no Google Agenda">${icon('agenda')}<span>${GCal.pulling?'Sincronizando...':'Sincronizar agora'}</span></button>`:''}${gcalOn?`<button class="btn" id="btn-gcal-push-all" title="Reenvia para o Google Agenda todos os agendamentos já sincronizados, com o título e a duração atuais">${icon('agenda')}<span>Atualizar todos no Google</span></button>`:''}<button class="btn" id="btn-export-agenda">${icon('download')}<span>Exportar Excel</span></button><button class="btn btn-primary" id="btn-new-appt">${icon('plus')}<span>Novo agendamento</span></button>`;
   actions.querySelector('#btn-new-appt').addEventListener('click', ()=>openApptForm());
   actions.querySelector('#btn-gcal').addEventListener('click', ()=>{
     if(GCal.isConnected()){
