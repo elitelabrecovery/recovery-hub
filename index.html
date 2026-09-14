@@ -3587,7 +3587,7 @@ function renderRanking(root, actions){
 
   const rankToday = todayISO();
   let rows, valueLabel, isMoney, nameFn, subFn, colLabel;
-  let monthlyRows=null, monthlySummary=null;
+  let monthlyRows=null, monthlySummary=null, monthlyChartRows=null;
 
   if(rankTab==='monthly-avg'){
     const byMonth = {};
@@ -3608,7 +3608,7 @@ function renderRanking(root, actions){
       const [y,m] = mk.split('-').map(Number);
       return { mk, label: `${MONTH_LABELS[m-1]} de ${y}`, count: byMonth[mk].count, value: byMonth[mk].value };
     });
-    const monthlyChartRows = monthlyRows.slice().reverse(); // ordem cronológica (mais antigo → mais recente) para o gráfico
+    monthlyChartRows = monthlyRows.slice().reverse(); // ordem cronológica (mais antigo → mais recente) para o gráfico
     const totalCount = monthlyRows.reduce((s,r)=>s+r.count,0);
     const totalValue = monthlyRows.reduce((s,r)=>s+r.value,0);
     let periodMonths;
