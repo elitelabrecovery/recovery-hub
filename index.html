@@ -2951,7 +2951,7 @@ ${list.length===0 ? `<div class="empty">${icon('agenda')}<p>Nenhum agendamento n
     bodyHTML = `
       <div class="agenda-nav">
         <button class="btn btn-ghost icon-btn" id="week-prev">‹</button>
-        <h3>${fmtDateShort(weekStart)} – ${fmtDate(weekEnd)}</h3>
+        <h3>${fmtDateShort(weekStart)} – ${fmtDate(weekEnd)} <span class="muted" style="font-size:12px;font-weight:400;">(${exportList.length} agendamento${exportList.length===1?'':'s'} na semana)</span></h3>
         <div class="flex gap8">
           <button class="btn btn-sm" id="week-today">Hoje</button>
           <button class="btn btn-ghost icon-btn" id="week-next">›</button>
@@ -2994,7 +2994,7 @@ ${list.length===0 ? `<div class="empty">${icon('agenda')}<p>Nenhum agendamento n
     bodyHTML = `
       <div class="agenda-nav">
         <button class="btn btn-ghost icon-btn" id="month-prev">‹</button>
-        <h3>${MONTH_LABELS[m-1]} de ${y}</h3>
+        <h3>${MONTH_LABELS[m-1]} de ${y} <span class="muted" style="font-size:12px;font-weight:400;">(${exportList.length} agendamento${exportList.length===1?'':'s'} no mês)</span></h3>
         <div class="flex gap8">
           <button class="btn btn-sm" id="month-today">Hoje</button>
           <button class="btn btn-ghost icon-btn" id="month-next">›</button>
