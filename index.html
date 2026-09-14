@@ -3058,6 +3058,7 @@ renderAgenda(root,actions);
   root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
     if(confirm('Remover este agendamento?')){
       const appt = appointments.find(a=>a.id===b.dataset.del);
+      GCal._ensureToken(); // dispara a renovação do token do Google dentro do gesto do clique (antes de qualquer await), para o navegador não bloquear o popup de renovação
       (async ()=>{
         if(appt) await GCal.syncDelete(appt);
         await Store.remove('appointments', b.dataset.del);
@@ -3081,6 +3082,7 @@ renderAgenda(root,actions);
 async function completeAppointment(appt){
   if(!appt) return;
   if(!confirm('Marcar este agendamento como concluído?\nO pagamento será registrado automaticamente como PAGO e lançado no Financeiro como receita, na data do agendamento.')) return;
+  GCal._ensureToken(); // dispara a renovação do token do Google dentro do gesto do clique (antes de qualquer await), para o navegador não bloquear o popup de renovação
   await Store.update('appointments', appt.id, {status:'concluido', paymentStatus:'pago'});
   await syncApptRevenue({...appt, status:'concluido'});
   const gcalOk = await GCal.syncUpsert({...appt, status:'concluido'});
@@ -3152,6 +3154,7 @@ function openApptForm(existing){
       }
     });
     root.querySelector('#f-save').addEventListener('click', async ()=>{
+      GCal._ensureToken(); // dispara a renovação do token do Google dentro do gesto do clique (antes de qualquer await), para o navegador não bloquear o popup de renovação
       const clientId=root.querySelector('#f-client').value, serviceId=root.querySelector('#f-service').value;
       if(!clientId || !serviceId){ showToast('Selecione cliente e serviço'); return; }
       const client=clients.find(c=>c.id===clientId), service=services.find(s=>s.id===serviceId);
