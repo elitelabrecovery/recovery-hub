@@ -3515,6 +3515,43 @@ function weekdayIndex(iso){
   return new Date(Date.UTC(y, m-1, d)).getUTCDay();
 }
 
+function buildMonthlyBarChartSVG(rows){
+  const padL=46, padR=16, padT=28, padB=48;
+  const n = rows.length;
+  const slot = 64;
+  const innerW = slot*n;
+  const W = padL+padR+innerW;
+  const H = 260;
+  const innerH = H-padT-padB;
+  const maxCount = Math.max(1, ...rows.map(r=>r.count));
+  const barW = Math.max(10, Math.min(44, slot*0.55));
+  const y = c => padT + innerH - (c/maxCount)*innerH;
+  const gridLines = [0,0.5,1].map(t=>{
+    const yy = padT + innerH*(1-t);
+    const val = Math.round(maxCount*t);
+    return `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W-padR}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
+      <text x="${padL-8}" y="${(yy+3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="var(--muted)">${val}</text>`;
+  }).join('');
+  const baseY = padT+innerH;
+  const bars = rows.map((r,i)=>{
+    const cx = padL + slot*i + slot/2;
+    const bx = cx - barW/2;
+    const by = y(r.count);
+    const bh = Math.max(0, baseY - by);
+    return `
+      <rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="4" fill="var(--accent)"/>
+      <text x="${cx.toFixed(1)}" y="${(by-6).toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">${r.count}</text>
+      <text x="${cx.toFixed(1)}" y="${(baseY+16).toFixed(1)}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${monthShortLabel(r.mk)}</text>
+      <text x="${cx.toFixed(1)}" y="${(baseY+29).toFixed(1)}" text-anchor="middle" font-size="8.5" fill="var(--muted)">${fmtMoney(r.value)}</text>
+    `;
+  }).join('');
+  return `<div style="overflow-x:auto;"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;">
+    <line x1="${padL}" y1="${baseY.toFixed(1)}" x2="${W-padR}" y2="${baseY.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
+    ${gridLines}
+    ${bars}
+  </svg></div>`;
+}
+
 let rankTab='clients-revenue';
 let rankFrom = '';
 let rankTo = '';
@@ -3571,6 +3608,7 @@ function renderRanking(root, actions){
       const [y,m] = mk.split('-').map(Number);
       return { mk, label: `${MONTH_LABELS[m-1]} de ${y}`, count: byMonth[mk].count, value: byMonth[mk].value };
     });
+    const monthlyChartRows = monthlyRows.slice().reverse(); // ordem cronológica (mais antigo → mais recente) para o gráfico
     const totalCount = monthlyRows.reduce((s,r)=>s+r.count,0);
     const totalValue = monthlyRows.reduce((s,r)=>s+r.value,0);
     let periodMonths;
@@ -3616,17 +3654,9 @@ function renderRanking(root, actions){
     </div>
     <div class="card" style="margin-top:14px;">
       <div class="card-head"><h3>${tabs.find(t=>t.id===rankTab).label}</h3><span class="muted" style="font-size:12px;">${monthlyRows.length} mês(es)</span></div>
-      <div class="card-body tight">
+      <div class="card-body">
         ${monthlyRows.length===0 ? `<div class="empty">${icon('ranking')}<p>Ainda não há dados suficientes para este ranking.</p></div>` :
-        `<div class="table-wrap"><table>
-          <thead><tr><th>Mês</th><th>Atendimentos</th><th>Valor total</th></tr></thead>
-          <tbody>${monthlyRows.map(r=>`
-            <tr>
-              <td class="cell-strong">${escapeHtml(r.label)}</td>
-              <td class="tnum">${r.count}</td>
-              <td class="tnum cell-strong">${fmtMoney(r.value)}</td>
-            </tr>`).join('')}</tbody>
-        </table></div>`}
+        buildMonthlyBarChartSVG(monthlyChartRows)}
       </div>
     </div>
     ` : `
