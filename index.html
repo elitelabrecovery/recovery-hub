@@ -1064,7 +1064,7 @@ function exportToExcel(filename, sheets){
     showToast('Planilha exportada');
   }catch(e){ console.warn('export excel error', e); showToast('Não foi possível exportar a planilha'); }
 }
-function exportRankingPdf(title, periodLabel, colLabel, valueLabel, rows, isMoney){
+function exportRankingPdf(title, periodLabel, colLabel, valueLabel, rows, isMoney, extraCol){
   if(typeof window.jspdf==='undefined'){ showToast('Biblioteca de exportação não carregou. Verifique sua conexão e tente novamente.'); return; }
   try{
     const { jsPDF } = window.jspdf;
@@ -1073,8 +1073,11 @@ function exportRankingPdf(title, periodLabel, colLabel, valueLabel, rows, isMone
     doc.setFontSize(12); doc.text(title, 14, 24);
     doc.setFontSize(10); doc.setTextColor(120); doc.text(periodLabel, 14, 30);
     doc.setTextColor(0);
-    const body = rows.map((r,i)=>[String(i+1), r.name, isMoney?fmtMoney(r.value):String(r.value)]);
-    doc.autoTable({ startY:36, head:[['#',colLabel,valueLabel]], body, headStyles:{fillColor:[232,92,13]}, styles:{fontSize:9} });
+    const head = extraCol ? [['#',colLabel,valueLabel,extraCol.label]] : [['#',colLabel,valueLabel]];
+    const body = rows.map((r,i)=> extraCol
+      ? [String(i+1), r.name, isMoney?fmtMoney(r.value):String(r.value), extraCol.isMoney?fmtMoney(r.value2):String(r.value2)]
+      : [String(i+1), r.name, isMoney?fmtMoney(r.value):String(r.value)]);
+    doc.autoTable({ startY:36, head, body, headStyles:{fillColor:[232,92,13]}, styles:{fontSize:9} });
     doc.save((title.toLowerCase().replace(/[^a-z0-9]+/g,'-'))+'.pdf');
     showToast('PDF exportado');
   }catch(e){ console.warn('export pdf error', e); showToast('Não foi possível exportar o PDF'); }
@@ -2789,6 +2792,7 @@ function toISODate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padSt
 function addDaysISO(dateStr, n){ const d=new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return toISODate(d); }
 function weekStartISO(dateStr){ const d=new Date(dateStr+'T00:00:00'); const dow=d.getDay(); const diff=(dow===0?-6:1-dow); d.setDate(d.getDate()+diff); return toISODate(d); }
 function addMonthsKey(monthStr, n){ const [y,m]=monthStr.split('-').map(Number); const d=new Date(y, m-1+n, 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function monthsBetweenKeys(fromKey, toKey){ const [fy,fm]=fromKey.split('-').map(Number); const [ty,tm]=toKey.split('-').map(Number); return (ty-fy)*12 + (tm-fm) + 1; }
 const WEEKDAY_LABELS=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
 const MONTH_LABELS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
@@ -3541,17 +3545,51 @@ function renderRanking(root, actions){
     {id:'services-revenue', label:'Serviços por faturamento'},
     {id:'services-count', label:'Serviços por volume'},
     {id:'weekdays', label:'Dias da semana'},
+    {id:'monthly-avg', label:'Atendimentos por mês'},
   ];
+
+  const rankToday = todayISO();
   let rows, valueLabel, isMoney, nameFn, subFn, colLabel;
-  if(rankTab==='clients-revenue'){ rows=clientRevenue; valueLabel='Total gasto'; isMoney=true; colLabel='Cliente'; nameFn=x=>x.c.name; subFn=x=>`${appointments.filter(a=>a.clientId===x.c.id&&a.status==='concluido').length} sessões concluídas`; }
+  let monthlyRows=null, monthlySummary=null;
+
+  if(rankTab==='monthly-avg'){
+    const byMonth = {};
+    appointments.filter(a=>a.status==='concluido').forEach(a=>{
+      const mk = monthKey(a.date);
+      if(!mk) return;
+      if(!byMonth[mk]) byMonth[mk] = {count:0, value:0};
+      byMonth[mk].count++;
+    });
+    transactions.filter(t=>t.type==='receita').forEach(t=>{
+      const mk = monthKey(t.date);
+      if(!mk) return;
+      if(!byMonth[mk]) byMonth[mk] = {count:0, value:0};
+      byMonth[mk].value += Number(t.amount||0);
+    });
+    const monthKeysWithData = Object.keys(byMonth).sort();
+    monthlyRows = monthKeysWithData.slice().reverse().map(mk=>{
+      const [y,m] = mk.split('-').map(Number);
+      return { mk, label: `${MONTH_LABELS[m-1]} de ${y}`, count: byMonth[mk].count, value: byMonth[mk].value };
+    });
+    const totalCount = monthlyRows.reduce((s,r)=>s+r.count,0);
+    const totalValue = monthlyRows.reduce((s,r)=>s+r.value,0);
+    let periodMonths;
+    if(rankFrom && rankTo) periodMonths = Math.max(1, monthsBetweenKeys(monthKey(rankFrom), monthKey(rankTo)));
+    else if(rankFrom) periodMonths = Math.max(1, monthsBetweenKeys(monthKey(rankFrom), rankToday.slice(0,7)));
+    else periodMonths = Math.max(1, monthKeysWithData.length);
+    monthlySummary = { totalCount, totalValue, avgCount: totalCount/periodMonths, avgValue: totalValue/periodMonths, numMonths: monthKeysWithData.length, periodMonths };
+  }
+  else if(rankTab==='clients-revenue'){ rows=clientRevenue; valueLabel='Total gasto'; isMoney=true; colLabel='Cliente'; nameFn=x=>x.c.name; subFn=x=>`${appointments.filter(a=>a.clientId===x.c.id&&a.status==='concluido').length} sessões concluídas`; }
   else if(rankTab==='clients-freq'){ rows=clientFreq; valueLabel='Sessões'; isMoney=false; colLabel='Cliente'; nameFn=x=>x.c.name; subFn=x=>fmtMoney(transactions.filter(t=>t.type==='receita'&&t.clientId===x.c.id).reduce((s,t)=>s+Number(t.amount||0),0))+' gastos'; }
   else if(rankTab==='services-revenue'){ rows=serviceRevenue; valueLabel='Faturamento'; isMoney=true; colLabel='Serviço'; nameFn=x=>x.s.name; subFn=x=>x.s.category; }
   else if(rankTab==='services-count'){ rows=serviceCount; valueLabel='Sessões realizadas'; isMoney=false; colLabel='Serviço'; nameFn=x=>x.s.name; subFn=x=>x.s.category; }
   else { rows=weekdayRank; valueLabel='Agendamentos'; isMoney=false; colLabel='Dia da semana'; nameFn=x=>x.name; subFn=x=>totalWeekdaySessions? `${Math.round((x.value/totalWeekdaySessions)*100)}% do total de agendamentos` : ''; }
 
-  const maxVal = Math.max(1, ...rows.map(r=>r.value));
+  const maxVal = rows ? Math.max(1, ...rows.map(r=>r.value)) : 1;
 
   if(actions) actions.innerHTML = `<button class="btn" id="btn-export-rank-pdf">${icon('download')}<span>Exportar PDF</span></button>`;
+
+  const quickBtn = (id,label)=>`<button class="btn btn-sm" id="${id}">${label}</button>`;
 
   root.innerHTML = `
     <div class="card" style="margin-bottom:14px;">
@@ -3559,10 +3597,39 @@ function renderRanking(root, actions){
         <div class="field" style="min-width:150px;margin:0;"><label>De</label><input id="rank-from" type="date" value="${rankFrom}"/></div>
         <div class="field" style="min-width:150px;margin:0;"><label>Até</label><input id="rank-to" type="date" value="${rankTo}"/></div>
         <button class="btn btn-sm" id="rank-clear-period">Limpar período</button>
+        <div class="flex gap8" style="flex-wrap:wrap;">
+          ${quickBtn('rank-quick-current','Mês atual')}
+          ${quickBtn('rank-quick-6','6 meses')}
+          ${quickBtn('rank-quick-12','12 meses')}
+          ${quickBtn('rank-quick-24','24 meses')}
+        </div>
         <span class="muted" style="font-size:12px;">${escapeHtml(periodLabel)}</span>
       </div>
     </div>
     <div class="tabs" id="rank-tabs">${tabs.map(t=>`<button class="tab ${rankTab===t.id?'active':''}" data-t="${t.id}">${t.label}</button>`).join('')}</div>
+    ${rankTab==='monthly-avg' ? `
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:14px;margin-bottom:14px;">
+      <div class="kpi"><div class="kpi-label">Total de atendimentos</div><div class="kpi-value tnum">${monthlySummary.totalCount}</div><div class="kpi-delta flat">${monthlySummary.numMonths} mês(es) com dados</div></div>
+      <div class="kpi"><div class="kpi-label">Valor total</div><div class="kpi-value tnum" style="color:var(--good)">${fmtMoney(monthlySummary.totalValue)}</div></div>
+      <div class="kpi"><div class="kpi-label">Média de atendimentos/mês</div><div class="kpi-value tnum">${monthlySummary.avgCount.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="kpi-delta flat">sobre ${monthlySummary.periodMonths} mês(es) no período</div></div>
+      <div class="kpi"><div class="kpi-label">Média de valor/mês</div><div class="kpi-value tnum">${fmtMoney(monthlySummary.avgValue)}</div></div>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <div class="card-head"><h3>${tabs.find(t=>t.id===rankTab).label}</h3><span class="muted" style="font-size:12px;">${monthlyRows.length} mês(es)</span></div>
+      <div class="card-body tight">
+        ${monthlyRows.length===0 ? `<div class="empty">${icon('ranking')}<p>Ainda não há dados suficientes para este ranking.</p></div>` :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Mês</th><th>Atendimentos</th><th>Valor total</th></tr></thead>
+          <tbody>${monthlyRows.map(r=>`
+            <tr>
+              <td class="cell-strong">${escapeHtml(r.label)}</td>
+              <td class="tnum">${r.count}</td>
+              <td class="tnum cell-strong">${fmtMoney(r.value)}</td>
+            </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+    ` : `
     <div class="card" style="margin-top:14px;">
       <div class="card-head"><h3>${tabs.find(t=>t.id===rankTab).label}</h3><span class="muted" style="font-size:12px;">Top ${Math.min(10,rows.length)}</span></div>
       <div class="card-body tight">
@@ -3579,14 +3646,29 @@ function renderRanking(root, actions){
         </table></div>`}
       </div>
     </div>
+    `}
   `;
   root.querySelectorAll('#rank-tabs .tab').forEach(t=>t.addEventListener('click', ()=>{ rankTab=t.dataset.t; renderRanking(root, actions); }));
   root.querySelector('#rank-from').addEventListener('change', e=>{ rankFrom=e.target.value; renderRanking(root, actions); });
   root.querySelector('#rank-to').addEventListener('change', e=>{ rankTo=e.target.value; renderRanking(root, actions); });
   root.querySelector('#rank-clear-period').addEventListener('click', ()=>{ rankFrom=''; rankTo=''; renderRanking(root, actions); });
+  const setQuickPeriod = (months)=>{
+    const fromKey = addMonthsKey(rankToday.slice(0,7), -(months-1));
+    rankFrom = `${fromKey}-01`;
+    rankTo = rankToday;
+    renderRanking(root, actions);
+  };
+  root.querySelector('#rank-quick-current').addEventListener('click', ()=>setQuickPeriod(1));
+  root.querySelector('#rank-quick-6').addEventListener('click', ()=>setQuickPeriod(6));
+  root.querySelector('#rank-quick-12').addEventListener('click', ()=>setQuickPeriod(12));
+  root.querySelector('#rank-quick-24').addEventListener('click', ()=>setQuickPeriod(24));
   const exportBtn = actions && actions.querySelector('#btn-export-rank-pdf');
   if(exportBtn) exportBtn.addEventListener('click', ()=>{
-    exportRankingPdf(tabs.find(t=>t.id===rankTab).label, periodLabel, colLabel, valueLabel, rows.slice(0,10).map(r=>({name:nameFn(r), value:r.value})), isMoney);
+    if(rankTab==='monthly-avg'){
+      exportRankingPdf('Atendimentos por mês', periodLabel, 'Mês', 'Atendimentos', monthlyRows.map(r=>({name:r.label, value:r.count, value2:r.value})), false, {label:'Valor total', isMoney:true});
+    } else {
+      exportRankingPdf(tabs.find(t=>t.id===rankTab).label, periodLabel, colLabel, valueLabel, rows.slice(0,10).map(r=>({name:nameFn(r), value:r.value})), isMoney);
+    }
   });
 }
 
