@@ -1118,6 +1118,7 @@ const Store = {
   db:null,
   data:{ clients:[], services:[], appointments:[], transactions:[], recurringExpenses:[], assessments:[], settings:[], bankAccounts:[], bankAccountHistory:[], bankAccountTotalHistory:[], events:[], eventParticipants:[] },
   apptsLoaded:false, // true assim que a 1ª foto do Firestore de "appointments" chega (evita corrida com o GCal)
+  loadedColls:new Set(), // coleções que já receberam pelo menos 1 snapshot do Firestore (evita ler dados parciais)
   listeners:[],
   onChange(cb){ this.listeners.push(cb); },
   emit(){ this.listeners.forEach(cb=>cb()); },
@@ -1132,6 +1133,7 @@ const Store = {
         this.db.collection(coll).onSnapshot(snap=>{
           this.data[coll]=snap.docs.map(d=>({id:d.id,...d.data()}));
           if(coll==='appointments') this.apptsLoaded = true;
+          this.loadedColls.add(coll);
           this.emit();
         }, err=>{ console.warn('firebase error',coll,err); setSyncPill('error'); });
       });
@@ -5463,6 +5465,12 @@ function getBirthdayClientsToday(){
 
 function showAbsenceAlertPopupOnce(){
   if(__absenceAlertShown) return;
+  // Evita calcular a lista de ausentes com dados parciais: só decide o que mostrar
+  // depois que clients, appointments e settings já carregaram pelo menos 1 vez do
+  // Firestore. Sem essa espera, se o popup de aniversariantes disparasse antes de
+  // 'settings' (ou 'appointments') chegar, ele travava __absenceAlertShown=true
+  // com a lista de ausentes vazia (ou incompleta) para o resto da sessão.
+  if(Store.mode==='firebase' && !(Store.loadedColls.has('clients') && Store.loadedColls.has('appointments') && Store.loadedColls.has('settings'))) return;
   var s = getAbsenceSettings();
   var rows = s.enabled ? getAbsentClients(s.days, s.topN) : [];
   var birthdays = getBirthdayClientsToday();
