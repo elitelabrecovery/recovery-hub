@@ -1724,6 +1724,7 @@ async function renderUsers(root, actions){
       + '<button class="btn btn-ghost btn-sm" data-edit="'+u.id+'">Editar</button>'
       + '<button class="btn btn-ghost btn-sm" data-reset="'+u.id+'" data-email="'+escapeHtml(u.email||'')+'">Redefinir senha</button>'
       + '<button class="btn '+(blocked?'btn-primary':'btn-ghost')+' btn-sm" data-toggle="'+u.id+'" data-blocked="'+(blocked?'1':'0')+'">'+(blocked?'Desbloquear':'Bloquear')+'</button>'
+      + (isSelf ? '' : '<button class="btn btn-ghost btn-sm btn-danger" data-delete="'+u.id+'" data-name="'+escapeHtml(u.name||u.email||'este usuário')+'">Excluir</button>')
       + '</div></td></tr>';
   }).join('');
   tbody.querySelectorAll('[data-edit]').forEach(function(btn){
@@ -1757,6 +1758,23 @@ async function renderUsers(root, actions){
         showToast(wasBlocked ? 'Usuário desbloqueado.' : 'Usuário bloqueado.');
         renderUsers(root, actions);
       }catch(e){ showToast('Falha ao atualizar usuário.'); }
+    });
+  });
+  tbody.querySelectorAll('[data-delete]').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      const id = btn.dataset.delete;
+      const name = btn.dataset.name;
+      if(!confirm('Excluir o usuário "'+name+'"? Ele perde o acesso ao app imediatamente. Essa ação não pode ser desfeita por aqui.')) return;
+      btn.disabled = true;
+      try{
+        await firebaseDb.collection('team_users').doc(id).delete();
+        showToast('Usuário excluído.');
+        renderUsers(root, actions);
+      }catch(e){
+        console.warn(e);
+        showToast('Falha ao excluir usuário.');
+        btn.disabled = false;
+      }
     });
   });
 }
