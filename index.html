@@ -1558,7 +1558,7 @@ function showForcePasswordChange(){
     overlay.innerHTML = '<div class="pin-card" style="max-width:340px;">'
       + '<p style="font-weight:700;font-size:15px;margin:0 0 6px;">Defina sua senha</p>'
       + '<p class="muted" style="margin:0 0 4px;font-size:12.5px;">Por segurança, defina uma nova senha antes de continuar.</p>'
-      + '<input id="fpw-new" type="password" placeholder="Nova senha (mín. 6 caracteres)" style="margin-top:10px;text-align:left;letter-spacing:normal;font-size:14px;"/>'
+      + '<input id="fpw-new" type="password" placeholder="Nova senha (mín. 8 caracteres)" style="margin-top:10px;text-align:left;letter-spacing:normal;font-size:14px;"/>'
       + '<input id="fpw-confirm" type="password" placeholder="Confirmar nova senha" style="margin-top:8px;text-align:left;letter-spacing:normal;font-size:14px;"/>'
       + '<p class="err" id="fpw-error"></p>'
       + '<button class="btn btn-primary" id="fpw-submit" type="button" style="width:100%;justify-content:center;margin-top:6px;">Salvar e continuar</button>';
@@ -1568,7 +1568,7 @@ function showForcePasswordChange(){
       var p2 = document.getElementById('fpw-confirm').value;
       var err = document.getElementById('fpw-error');
       err.textContent='';
-      if(!p1 || p1.length<6){ err.textContent='A senha precisa ter pelo menos 6 caracteres.'; return; }
+      if(!p1 || p1.length<8){ err.textContent='A senha precisa ter pelo menos 8 caracteres.'; return; }
       if(p1!==p2){ err.textContent='As senhas não conferem.'; return; }
       var btn = document.getElementById('fpw-submit'); btn.disabled=true;
       firebaseAuth.currentUser.updatePassword(p1).then(function(){
@@ -1816,7 +1816,7 @@ function openUserForm(){
     + '<p class="muted" style="font-size:12.5px;margin-top:0;">O usuário pode trocar a senha depois pelo link "Esqueci minha senha" na tela de login.</p>'
     + '<div class="field"><label>Nome completo</label><input id="nu-name" placeholder="Nome e sobrenome"/></div>'
     + '<div class="field"><label>E-mail</label><input id="nu-email" type="email" placeholder="email@exemplo.com"/></div>'
-    + '<div class="field"><label>Senha inicial</label><input id="nu-pass" type="text" placeholder="mínimo 6 caracteres"/></div>'
+    + '<div class="field"><label>Senha inicial</label><input id="nu-pass" type="text" placeholder="mínimo 8 caracteres"/></div>'
     + '<div class="field"><label>Papel</label><select id="nu-role"><option value="staff">Equipe</option><option value="admin">Administrador</option></select></div>'
     + '<p class="err" id="nu-error"></p>'
     + '</div>'
@@ -1830,7 +1830,7 @@ function openUserForm(){
         const err = modalRoot.querySelector('#nu-error');
         err.textContent='';
         if(!name || !email || !pass){ err.textContent='Preencha nome, e-mail e senha.'; return; }
-        if(pass.length<6){ err.textContent='A senha precisa ter pelo menos 6 caracteres.'; return; }
+        if(pass.length<8){ err.textContent='A senha precisa ter pelo menos 8 caracteres.'; return; }
         const saveBtn = modalRoot.querySelector('#nu-save'); saveBtn.disabled=true;
         let secondaryApp;
         try{
@@ -1852,7 +1852,7 @@ function openUserForm(){
         }catch(e){
           console.warn(e);
           if(e && e.code==='auth/email-already-in-use') err.textContent='Já existe um usuário com esse e-mail.';
-          else if(e && e.code==='auth/weak-password') err.textContent='Senha muito fraca — use pelo menos 6 caracteres.';
+          else if(e && e.code==='auth/weak-password') err.textContent='Senha muito fraca — use pelo menos 8 caracteres.';
           else if(e && e.code==='auth/invalid-email') err.textContent='E-mail inválido.';
           else err.textContent='Não foi possível criar o usuário.';
           if(secondaryApp){ try{ await secondaryApp.delete(); }catch(_e){} }
