@@ -2040,7 +2040,7 @@ function renderDashboard(root, actions){
         <div class="card-head"><h3>Receita — últimos 6 meses</h3></div>
         <div class="card-body">
           <div class="bars">
-            ${monthRev.map((v,i)=>`<div class="bar-col"><div class="bar-value tnum">${v>0?(v/1000).toFixed(1)+'k':''}</div><div class="bar" style="height:${Math.max(4,(v/maxRev)*100)}%"></div><div class="bar-label">${monthLabels[i]}</div></div>`).join('')}
+            ${monthRev.map((v,i)=>`<div class="bar-col"><div class="bar-value tnum">${v>0?(valuesHidden?'••••':(v/1000).toFixed(1)+'k'):''}</div><div class="bar" style="height:${Math.max(4,(v/maxRev)*100)}%"></div><div class="bar-label">${monthLabels[i]}</div></div>`).join('')}
           </div>
         </div>
       </div>
