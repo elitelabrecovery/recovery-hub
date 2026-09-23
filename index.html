@@ -2276,7 +2276,18 @@ function openClientForm(existing){
       const email = root.querySelector('#f-email').value.trim();
       const birthDate = root.querySelector('#f-birth').value;
       const payload={ name, cpf, birthDate, phone:root.querySelector('#f-phone').value.trim(), email, status:root.querySelector('#f-status').value, tier:root.querySelector('#f-tier').value||null, notes:root.querySelector('#f-notes').value.trim() };
-      if(isEdit) await Store.update('clients', existing.id, payload); else await Store.add('clients', payload);
+      // Só fecha o modal/avisa sucesso depois de CONFIRMADO que gravou no banco. Se falhar,
+      // o modal continua aberto com os dados preenchidos — nada é perdido, o usuário só tenta de novo.
+      const btnSave = root.querySelector('#f-save');
+      if(btnSave) btnSave.disabled = true;
+      try{
+        if(isEdit) await Store.update('clients', existing.id, payload); else await Store.add('clients', payload);
+      }catch(e){
+        console.warn('Falha ao salvar cliente no banco', e);
+        showToast('Não foi possível salvar o cliente — verifique a conexão e tente novamente. Os dados preenchidos continuam aqui.');
+        if(btnSave) btnSave.disabled = false;
+        return;
+      }
       showToast(isEdit?'Cliente atualizado':'Cliente cadastrado'); closeModal();
     });
   });
@@ -3113,10 +3124,19 @@ renderAgenda(root,actions);
 async function completeAppointment(appt){
   if(!appt) return;
   if(!confirm('Marcar este agendamento como concluído?\nO pagamento será registrado automaticamente como PAGO e lançado no Financeiro como receita, na data do agendamento.')) return;
-  GCal._ensureToken(); // dispara a renovação do token do Google dentro do gesto do clique (antes de qualquer await), para o navegador não bloquear o popup de renovação
-  await Store.update('appointments', appt.id, {status:'concluido', paymentStatus:'pago'});
+  // Grava primeiro no banco — só chama a API do Google DEPOIS de confirmado.
+  try{
+    await Store.update('appointments', appt.id, {status:'concluido', paymentStatus:'pago'});
+  }catch(e){
+    console.warn('Falha ao salvar conclusão do agendamento no banco', e);
+    showToast('Não foi possível concluir o agendamento — verifique a conexão e tente novamente.');
+    return;
+  }
+  GCal._ensureToken(); // renovação do token só depois do agendamento já estar salvo no banco
   await syncApptRevenue({...appt, status:'concluido'});
-  const gcalOk = await GCal.syncUpsert({...appt, status:'concluido'});
+  let gcalOk = true;
+  try{ gcalOk = await GCal.syncUpsert({...appt, status:'concluido'}); }
+  catch(e){ console.warn('Falha ao sincronizar conclusão com o Google Agenda', e); gcalOk = false; }
   showToast((gcalOk===false && GCal.isConnected()) ? 'Agendamento concluído e pago — falha ao sincronizar com o Google Agenda, será tentado de novo na próxima edição' : 'Agendamento concluído e pago');
 }
 
@@ -3185,23 +3205,35 @@ function openApptForm(existing){
       }
     });
     root.querySelector('#f-save').addEventListener('click', async ()=>{
-      GCal._ensureToken(); // dispara a renovação do token do Google dentro do gesto do clique (antes de qualquer await), para o navegador não bloquear o popup de renovação
       const clientId=root.querySelector('#f-client').value, serviceId=root.querySelector('#f-service').value;
       if(!clientId || !serviceId){ showToast('Selecione cliente e serviço'); return; }
       const client=clients.find(c=>c.id===clientId), service=services.find(s=>s.id===serviceId);
       const status=root.querySelector('#f-status').value;
       const payload={ clientId, clientName:client?.name||'', serviceId, serviceName:service?.name||'', date:root.querySelector('#f-date').value||todayISO(), time:root.querySelector('#f-time').value, duration:Number(root.querySelector('#f-duration').value)||service?.duration||50, price:Number(root.querySelector('#f-price').value)||0, status, notes:root.querySelector('#f-notes').value.trim(), paymentStatus: status==='concluido' ? 'pago' : (existing?.paymentStatus||'pendente'), nfseStatus:root.querySelector('#f-nfse').value, ...(existing?.gcalSource==='google'?{needsReview:false}:{}) };
+      // 1) Grava primeiro no banco — a API do Google só é chamada DEPOIS de confirmado que o
+      // agendamento foi salvo no Firestore. Se a gravação falhar, o modal continua aberto com
+      // os dados preenchidos (nada é perdido) para o usuário tentar salvar de novo.
+      const btnSave = root.querySelector('#f-save');
+      if(btnSave) btnSave.disabled = true;
       let apptId = existing?.id;
-      let gcalOk = true;
-      if(isEdit){
-        await Store.update('appointments', existing.id, payload);
-        gcalOk = await GCal.syncUpsert({...existing, ...payload, id:existing.id});
-      } else {
-        apptId = await Store.add('appointments', payload);
-        gcalOk = await GCal.syncUpsert({...payload, id:apptId});
+      try{
+        if(isEdit) await Store.update('appointments', existing.id, payload);
+        else apptId = await Store.add('appointments', payload);
+      }catch(e){
+        console.warn('Falha ao salvar agendamento no banco', e);
+        showToast('Não foi possível salvar o agendamento — verifique a conexão e tente novamente. Os dados preenchidos continuam aqui.');
+        if(btnSave) btnSave.disabled = false;
+        return;
       }
+      // 2) Agendamento confirmado no banco: só agora aciona a renovação do token e a
+      // sincronização com o Google Agenda — uma falha aqui não afeta o que já foi salvo.
+      GCal._ensureToken();
+      let gcalOk = true;
+      try{ gcalOk = await GCal.syncUpsert({...(existing||{}), ...payload, id:apptId}); }
+      catch(e){ console.warn('Falha ao sincronizar agendamento com o Google Agenda', e); gcalOk = false; }
       await syncApptRevenue({...payload, id:apptId});
-      showToast((gcalOk===false && GCal.isConnected()) ? (isEdit?'Agendamento atualizado — falha ao sincronizar com o Google Agenda, será tentado de novo na próxima edição':'Agendamento criado — falha ao sincronizar com o Google Agenda, será tentado de novo na próxima edição') : (isEdit?'Agendamento atualizado':'Agendamento criado')); closeModal();
+      showToast((gcalOk===false && GCal.isConnected()) ? (isEdit?'Agendamento atualizado — falha ao sincronizar com o Google Agenda, será tentado de novo na próxima edição':'Agendamento criado — falha ao sincronizar com o Google Agenda, será tentado de novo na próxima edição') : (isEdit?'Agendamento atualizado':'Agendamento criado'));
+      closeModal();
     });
   });
 }
