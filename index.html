@@ -197,6 +197,8 @@
   .kpi-delta.down{color:var(--bad);}
   .kpi-delta.flat{color:var(--muted);}
 
+  .mt-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:20px;margin-top:18px;}
+  @media (max-width:980px){.mt-grid{grid-template-columns:1fr;}}
   .grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:start;}
   @media (max-width:980px){.grid-2{grid-template-columns:1fr;}}
 
@@ -2001,6 +2003,88 @@ function openAbsenceSettingsModal(){
   });
 }
 
+function buildMonthTrendCard(appointments, today){
+  const mk = monthKey(today);
+  const [yy,mm] = mk.split('-').map(Number);
+  const daysInMonth = new Date(yy, mm, 0).getDate();
+  const monthName = new Date(yy, mm-1, 1).toLocaleDateString('pt-BR',{month:'long'});
+  const monthTitle = monthName.charAt(0).toUpperCase()+monthName.slice(1)+'/'+yy;
+  const wk = ['dom','seg','ter','qua','qui','sex','sáb'];
+  const inMonth = appointments.filter(a=> a.date && monthKey(a.date)===mk);
+  const done = inMonth.filter(a=> a.status==='concluido' && a.date<=today);
+  const upcoming = inMonth.filter(a=> a.status==='agendado' && a.date>=today);
+  const doneByDay = {}, upByDay = {};
+  done.forEach(a=>{ const d=Number(a.date.slice(8,10)); doneByDay[d]=(doneByDay[d]||0)+1; });
+  upcoming.forEach(a=>{ const d=Number(a.date.slice(8,10)); upByDay[d]=(upByDay[d]||0)+1; });
+  const todayNum = Number(today.slice(8,10));
+  const maxDay = Math.max(1, ...Object.values(doneByDay), ...Object.values(upByDay));
+
+  // services
+  const svc = {};
+  done.forEach(a=>{ const n=a.serviceName||'—'; (svc[n]=svc[n]||{done:0,up:0}).done++; });
+  upcoming.forEach(a=>{ const n=a.serviceName||'—'; (svc[n]=svc[n]||{done:0,up:0}).up++; });
+  const svcList = Object.entries(svc).sort((a,b)=>(b[1].done+b[1].up)-(a[1].done+a[1].up) || a[0].localeCompare(b[0],'pt-BR')).slice(0,8);
+  const maxSvc = Math.max(1, ...svcList.map(([,v])=>v.done+v.up));
+
+  // top days
+  const dayLabel = d => `${String(d).padStart(2,'0')}/${String(mm).padStart(2,'0')} (${wk[new Date(yy,mm-1,d).getDay()]})`;
+  const topDays = obj => Object.entries(obj).map(([d,n])=>[Number(d),n]).sort((a,b)=>b[1]-a[1]||a[0]-b[0]).slice(0,3);
+  const topDone = topDays(doneByDay), topUp = topDays(upByDay);
+  const topDoneSet = new Set(topDone.map(x=>x[0])), topUpSet = new Set(topUp.map(x=>x[0]));
+  const topList = (list, emptyMsg) => list.length
+    ? '<ol style="margin:0;padding-left:18px;font-size:12.5px;color:var(--ink-soft);line-height:1.7;">'+list.map(([d,n])=>`<li><span class="cell-strong">${dayLabel(d)}</span> — <span class="tnum">${n}</span> atendimento${n>1?'s':''}</li>`).join('')+'</ol>'
+    : `<p class="muted" style="margin:0;font-size:12.5px;">${emptyMsg}</p>`;
+
+  const cols = [];
+  for(let d=1; d<=daysInMonth; d++){
+    const isFuture = d>todayNum || (d===todayNum);
+    const nDone = doneByDay[d]||0, nUp = upByDay[d]||0;
+    const hDone = nDone? Math.max(6,(nDone/maxDay)*100) : 0;
+    const hUp = nUp? Math.max(6,(nUp/maxDay)*100) : 0;
+    const showLbl = d===1 || d===todayNum || d%5===0;
+    const tip = `${dayLabel(d)}: ${nDone} realizado(s), ${nUp} agendado(s)`;
+    const hi = topDoneSet.has(d)||topUpSet.has(d);
+    cols.push(`<div title="${tip}" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;${d===todayNum?'background:var(--surface-2);border-radius:4px;':''}">
+      <div class="tnum" style="font-size:9.5px;color:${hi?'var(--accent-strong)':'var(--muted)'};font-weight:${hi?700:500};height:12px;line-height:12px;">${(nDone+nUp)||''}</div>
+      <div style="width:70%;display:flex;flex-direction:column;justify-content:flex-end;flex:1;">
+        ${nUp?`<div style="height:${hUp}%;background:var(--accent-soft);border:1.5px dashed var(--accent);border-radius:3px 3px 0 0;box-sizing:border-box;"></div>`:''}
+        ${nDone?`<div style="height:${hDone}%;background:var(--accent);border-radius:${nUp?'0':'3px 3px 0 0'};"></div>`:''}
+      </div>
+      <div style="font-size:9.5px;color:var(--muted);height:14px;line-height:14px;">${showLbl?d:''}</div>
+    </div>`);
+  }
+
+  const svcHtml = svcList.length ? svcList.map(([n,v])=>`
+    <div style="display:grid;grid-template-columns:minmax(90px,38%) 1fr auto;gap:10px;align-items:center;margin-bottom:8px;">
+      <div style="font-size:12.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(n)}">${escapeHtml(n)}</div>
+      <div style="display:flex;height:12px;background:var(--surface-2);border-radius:6px;overflow:hidden;">
+        <div style="width:${(v.done/maxSvc)*100}%;background:var(--accent);"></div>
+        <div style="width:${(v.up/maxSvc)*100}%;background:var(--accent-soft);border-left:${v.done?'0':'0'};box-shadow:inset 0 0 0 1px var(--accent);"></div>
+      </div>
+      <div class="tnum" style="font-size:12px;color:var(--ink-soft);white-space:nowrap;"><b>${v.done}</b> realiz. · <b>${v.up}</b> agend.</div>
+    </div>`).join('') : '<p class="muted" style="margin:0;font-size:12.5px;">Nenhum serviço realizado ou agendado neste mês.</p>';
+
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-head"><h3>Tendência do mês — ${monthTitle}</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;"><span class="badge good">${done.length} realizado(s)</span><span class="badge warn">${upcoming.length} agendado(s) a seguir</span></div>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:16px;font-size:11.5px;color:var(--muted);margin-bottom:8px;flex-wrap:wrap;">
+          <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent);border-radius:2px;vertical-align:-1px;"></span> Realizados</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent-soft);border:1.5px dashed var(--accent);border-radius:2px;vertical-align:-1px;box-sizing:border-box;"></span> Próximos agendamentos</span>
+          <span>Números em laranja escuro = dias de maior frequência</span>
+        </div>
+        <div style="display:flex;align-items:stretch;gap:2px;height:150px;">${cols.join('')}</div>
+        <div class="mt-grid">
+          <div><div class="kpi-label" style="margin-bottom:8px;">Principais serviços do mês</div>${svcHtml}</div>
+          <div><div class="kpi-label" style="margin-bottom:8px;">Dias mais cheios — realizados</div>${topList(topDone,'Nenhum atendimento realizado ainda.')}</div>
+          <div><div class="kpi-label" style="margin-bottom:8px;">Dias mais cheios — próximos</div>${topList(topUp,'Nenhum agendamento futuro no mês.')}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderDashboard(root, actions){
   if(actions) actions.innerHTML = (typeof currentTeamUser!=='undefined' && currentTeamUser && currentTeamUser.role==='admin') ? `<button class="btn" id="btn-abs-settings">${icon('settings')}<span>Notificação de ausentes</span></button>` : '';
   const {clients,appointments,transactions}=Store.data;
@@ -2035,6 +2119,7 @@ function renderDashboard(root, actions){
       <div class="kpi"><div class="kpi-label">Clientes ativos</div><div class="kpi-value tnum">${activeClients}</div><div class="kpi-delta flat">${clients.length} no total</div></div>
       <div class="kpi"><div class="kpi-label">Hoje</div><div class="kpi-value tnum">${todaysAppts.length}</div><div class="kpi-delta flat">agendamento(s) hoje</div></div>
     </div>
+    ${buildMonthTrendCard(appointments, today)}
     <div class="grid-2" style="margin-bottom:16px">
       <div class="card">
         <div class="card-head"><h3>Receita — últimos 6 meses</h3></div>
