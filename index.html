@@ -2130,7 +2130,7 @@ function exportClientsExcel(){
     return {
       'Nome': c.name||'', 'CPF': c.cpf||'', 'Nascimento': c.birthDate?fmtDate(c.birthDate):'', 'Telefone': c.phone||'', 'E-mail': c.email||'',
       'Categoria': CLIENT_TIERS[c.tier]?.label||'', 'Status': CLIENT_STATUS[c.status||'ativo']?.label||'',
-      'Sessões': appts.filter(a=>a.status==='concluido').length, 'Total gasto (R$)': spent, 'Cadastrado em': c.createdAt?fmtDate((c.createdAt||'').slice(0,10)):''
+      'Sessões concluídas': appts.filter(a=>a.status==='concluido').length, 'Agendadas (futuras)': appts.filter(a=>a.status==='agendado' && a.date && a.date>=new Date().toLocaleDateString('sv-SE')).length, 'Total gasto (R$)': spent, 'Cadastrado em': c.createdAt?fmtDate((c.createdAt||'').slice(0,10)):''
     };
   });
   exportToExcel('clientes-elitelab.xlsx', {'Clientes': rows});
@@ -2149,10 +2149,13 @@ function renderClients(root, actions){
   const qDigits = clientSearch.replace(/\D/g,'');
   let list = clients.filter(c=> foldText(c.name).includes(q) || (c.phone||'').includes(clientSearch) || (qDigits.length>=4 && (c.phone||'').replace(/\D/g,'').includes(qDigits)));
 
+  // Sessões futuras já agendadas (ainda NÃO realizadas) — ficam numa coluna à parte e nunca entram na contagem de "Sessões concluídas"
+  const todayKey = new Date().toLocaleDateString('sv-SE');
   const enriched = list.map(c=>{
     const appts = appointments.filter(a=>a.clientId===c.id);
+    const scheduled = appts.filter(a=>a.status==='agendado' && a.date && a.date>=todayKey);
     const spent = transactions.filter(t=>t.type==='receita'&&t.clientId===c.id).reduce((s,t)=>s+Number(t.amount||0),0);
-    return {c, appts, spent};
+    return {c, appts, scheduled, spent};
   });
   const CLIENT_SORT_VALUE = {
     name: e=> e.c.name||'',
@@ -2161,6 +2164,7 @@ function renderClients(root, actions){
     birthDate: e=> e.c.birthDate||'',
     phone: e=> e.c.phone||'',
     sessions: e=> e.appts.filter(a=>a.status==='concluido').length,
+    scheduled: e=> e.scheduled.length,
     spent: e=> e.spent,
     status: e=> CLIENT_STATUS[e.c.status||'ativo']?.label||'',
   };
@@ -2176,8 +2180,8 @@ function renderClients(root, actions){
         ${clients.length===0 ? `<div class="empty">${icon('users')}<p>Nenhum cliente cadastrado ainda.</p><button class="btn btn-primary" id="empty-new-client">${icon('plus')}Novo cliente</button></div>` :
         enriched.length===0 ? `<div class="empty">${icon('search')}<p>Nenhum cliente encontrado para "${escapeHtml(clientSearch)}".</p></div>` :
         `<div class="table-wrap"><table>
-          <thead><tr>${thSort('Cliente','name',clientSort)}${thSort('Categoria','tier',clientSort)}${thSort('CPF','cpf',clientSort)}${thSort('Nascimento','birthDate',clientSort)}${thSort('Contato','phone',clientSort)}${thSort('Sessões','sessions',clientSort)}${thSort('Total gasto','spent',clientSort)}${thSort('Status','status',clientSort)}<th></th></tr></thead>
-          <tbody>${enriched.map(({c, appts, spent})=>{
+          <thead><tr>${thSort('Cliente','name',clientSort)}${thSort('Categoria','tier',clientSort)}${thSort('CPF','cpf',clientSort)}${thSort('Nascimento','birthDate',clientSort)}${thSort('Contato','phone',clientSort)}${thSort('Sessões concluídas','sessions',clientSort)}${thSort('Agendadas','scheduled',clientSort).replace('data-sort="scheduled">','data-sort="scheduled" title="Sessões futuras já agendadas (ainda não realizadas)"><span class="icon-inline">'+icon('agenda')+'</span> ')}${thSort('Total gasto','spent',clientSort)}${thSort('Status','status',clientSort)}<th></th></tr></thead>
+          <tbody>${enriched.map(({c, appts, scheduled, spent})=>{
             const tier = CLIENT_TIERS[c.tier];
             return `<tr>
               <td class="flex gap10"><div class="avatar">${initials(c.name)}</div><div><div class="cell-strong">${escapeHtml(c.name)}</div><div class="muted" style="font-size:11.5px;">desde ${fmtDate((c.createdAt||'').slice(0,10))}</div></div></td>
@@ -2186,6 +2190,7 @@ function renderClients(root, actions){
               <td class="tnum">${c.birthDate?fmtDate(c.birthDate):'—'}</td>
               <td>${escapeHtml(c.phone||'—')}<div class="muted" style="font-size:11.5px;">${escapeHtml(c.email||'')}</div></td>
               <td class="tnum">${appts.filter(a=>a.status==='concluido').length}</td>
+              <td>${scheduled.length ? `<button class="btn btn-sm" data-scheduled="${c.id}" title="Sessões futuras agendadas — ainda não realizadas">${icon('agenda')}${scheduled.length} agendada${scheduled.length>1?'s':''}</button>` : '<span class="muted">—</span>'}</td>
               <td class="tnum cell-strong">${fmtMoney(spent)}</td>
               <td><span class="badge ${CLIENT_STATUS[c.status||'ativo']?.cls}">${CLIENT_STATUS[c.status||'ativo']?.label}</span></td>
               <td><div class="row-actions">
@@ -2205,6 +2210,7 @@ function renderClients(root, actions){
   const emptyBtn = root.querySelector('#empty-new-client'); if(emptyBtn) emptyBtn.addEventListener('click', ()=>openClientForm());
   root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openClientForm(clients.find(c=>c.id===b.dataset.edit))));
   root.querySelectorAll('[data-history]').forEach(b=>b.addEventListener('click', ()=>openClientSessionsHistory(b.dataset.history)));
+  root.querySelectorAll('[data-scheduled]').forEach(b=>b.addEventListener('click', ()=>openClientScheduledSessions(b.dataset.scheduled)));
   root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
     if(confirm('Remover este cliente? Os agendamentos e lançamentos vinculados não serão apagados.')){ Store.remove('clients', b.dataset.del); showToast('Cliente removido'); }
   }));
@@ -5605,6 +5611,27 @@ function openClientSessionsHistory(clientId){
     '<div class="modal-head"><h3>Histórico de sessões — '+escapeHtml(client.name)+'</h3><button class="btn btn-ghost icon-btn" data-close-modal>'+icon('close')+'</button></div>' +
     '<div class="modal-body">' +
       (sessions.length ? ('<div class="table-wrap"><table><thead><tr><th>Data</th><th>Serviço</th><th style="text-align:right;">Valor cobrado</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>') : ('<div class="empty">'+icon('search')+'<p>Nenhuma sessão concluída registrada para este cliente.</p></div>')) +
+    '</div>' +
+    '<div class="modal-foot"><button class="btn" data-close-modal>Fechar</button></div>',
+    null, {wide:true}
+  );
+}
+
+function openClientScheduledSessions(clientId){
+  const {clients, appointments} = Store.data;
+  const client = clients.find(c=>c.id===clientId);
+  if(!client) return;
+  const todayKey = new Date().toLocaleDateString('sv-SE');
+  const future = appointments.filter(a=>a.clientId===clientId && a.status==='agendado' && a.date && a.date>=todayKey).sort((x,y)=> (x.date+(x.time||'')).localeCompare(y.date+(y.time||'')));
+  const rowsHtml = future.map(function(a){
+    var valueStr = a.price!=null ? fmtMoney(Number(a.price)||0) : '—';
+    return '<tr><td class="tnum">'+fmtDate(a.date)+(a.time?' '+escapeHtml(a.time):'')+'</td><td>'+escapeHtml(a.serviceName||'—')+'</td><td class="tnum" style="text-align:right;">'+valueStr+'</td><td><span class="badge warn">Agendada</span></td></tr>';
+  }).join('');
+  openModal(
+    '<div class="modal-head"><h3>Sessões agendadas — '+escapeHtml(client.name)+'</h3><button class="btn btn-ghost icon-btn" data-close-modal>'+icon('close')+'</button></div>' +
+    '<div class="modal-body">' +
+      '<p class="muted" style="font-size:12.5px;margin:0 0 12px;">Sessões futuras já marcadas. Ainda não foram realizadas e não entram na contagem de sessões concluídas.</p>' +
+      (future.length ? ('<div class="table-wrap"><table><thead><tr><th>Data / hora</th><th>Serviço</th><th style="text-align:right;">Valor previsto</th><th>Situação</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>') : ('<div class="empty">'+icon('search')+'<p>Nenhuma sessão futura agendada para este cliente.</p></div>')) +
     '</div>' +
     '<div class="modal-foot"><button class="btn" data-close-modal>Fechar</button></div>',
     null, {wide:true}
