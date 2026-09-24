@@ -2048,20 +2048,24 @@ function buildMonthTrendCard(appointments, today){
   const ptsProj = cum.slice(todayNum-1).map((v,i)=>`${px(todayNum+i).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
   const pctDone = revTotal>0 ? Math.round(revDone/revTotal*100) : 0;
 
+  const wkShort = ['dom','seg','ter','qua','qui','sex','sáb'];
   const cols = [];
   for(let d=1; d<=daysInMonth; d++){
     const nDone = doneByDay[d]||0, nUp = upByDay[d]||0;
     const hDone = nDone? Math.max(6,(nDone/maxDay)*100) : 0;
     const hUp = nUp? Math.max(6,(nUp/maxDay)*100) : 0;
-    const showLbl = d===1 || d===todayNum || d===daysInMonth;
+    const dow = new Date(yy,mm-1,d).getDay();
+    const isToday = d===todayNum;
     const tip = `${dayLabel(d)}: ${nDone} realizado(s), ${nUp} agendado(s)`;
-    cols.push(`<div title="${tip}" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+    cols.push(`<div title="${tip}" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;${isToday?'background:var(--surface-2);border-radius:4px;':''}">
+      <div class="tnum" style="font-size:10px;height:13px;line-height:13px;font-weight:700;color:var(--ink-soft);">${(nDone+nUp)||''}</div>
       <div style="width:70%;display:flex;flex-direction:column;justify-content:flex-end;flex:1;">
         ${nUp?`<div style="height:${hUp}%;background:var(--accent-soft);border:1.5px dashed var(--accent);border-radius:3px 3px 0 0;box-sizing:border-box;"></div>`:''}
         ${nDone?`<div style="height:${hDone}%;background:var(--accent);border-radius:${nUp?'0':'3px 3px 0 0'};"></div>`:''}
         ${(!nDone&&!nUp)?`<div style="height:3px;background:var(--surface-2);border-radius:2px;"></div>`:''}
       </div>
-      <div style="font-size:9.5px;height:14px;line-height:14px;color:${d===todayNum?'var(--accent-strong)':'var(--muted)'};font-weight:${d===todayNum?700:500};">${showLbl?d:''}</div>
+      <div class="tnum" style="font-size:9.5px;line-height:12px;margin-top:2px;color:${isToday?'var(--accent-strong)':'var(--ink-soft)'};font-weight:${isToday?700:600};">${d}</div>
+      <div style="font-size:8.5px;line-height:11px;color:${(dow===0||dow===6)?'var(--accent-strong)':'var(--muted)'};text-transform:uppercase;">${wkShort[dow]}</div>
     </div>`);
   }
 
@@ -2074,7 +2078,7 @@ function buildMonthTrendCard(appointments, today){
         </div>
       </div>
       <div class="card-body">
-        <div style="display:flex;align-items:stretch;gap:2px;height:110px;">${cols.join('')}</div>
+        <div style="display:flex;align-items:stretch;gap:2px;height:150px;">${cols.join('')}</div>
         <div class="mt-grid">
           <div><div class="kpi-label">Serviço mais realizado</div>
             ${topSvc?`<div style="font-size:17px;font-weight:700;color:var(--ink);margin-top:4px;">${escapeHtml(topSvc[0])}</div><div class="muted" style="font-size:12px;">${topSvc[1]} realizado${topSvc[1]>1?'s':''} no mês</div>`:'<div class="muted" style="font-size:12.5px;margin-top:4px;">Sem atendimentos realizados ainda.</div>'}
