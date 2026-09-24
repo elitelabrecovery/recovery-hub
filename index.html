@@ -2143,8 +2143,11 @@ function renderClients(root, actions){
   actions.querySelector('#btn-export-clients').addEventListener('click', exportClientsExcel);
 
   const {clients, appointments, transactions} = Store.data;
-  const q = clientSearch.toLowerCase();
-  let list = clients.filter(c=> (c.name||'').toLowerCase().includes(q) || (c.phone||'').includes(clientSearch));
+  // Busca sem acento e sem diferenciar maiúsculas (ex.: "julia" encontra "JÚLIA"); telefone compara só os dígitos
+  const foldText = normalizeSearch;
+  const q = foldText(clientSearch);
+  const qDigits = clientSearch.replace(/\D/g,'');
+  let list = clients.filter(c=> foldText(c.name).includes(q) || (c.phone||'').includes(clientSearch) || (qDigits.length>=4 && (c.phone||'').replace(/\D/g,'').includes(qDigits)));
 
   const enriched = list.map(c=>{
     const appts = appointments.filter(a=>a.clientId===c.id);
@@ -2299,8 +2302,8 @@ function renderServices(root, actions){
   actions.querySelector('#btn-new-service').addEventListener('click', ()=>openServiceForm());
 
   const {services, appointments} = Store.data;
-  const q = serviceSearch.toLowerCase();
-  const list = services.filter(s=> (s.name||'').toLowerCase().includes(q) || (s.category||'').toLowerCase().includes(q));
+  const q = normalizeSearch(serviceSearch);
+  const list = services.filter(s=> normalizeSearch(s.name).includes(q) || normalizeSearch(s.category).includes(q));
 
   const enriched = list.map(s=> ({s, count: appointments.filter(a=>a.serviceId===s.id && a.status==='concluido').length}));
   const SERVICE_SORT_VALUE = {
@@ -3282,7 +3285,7 @@ function renderFinance(root, actions){
   const {transactions, recurringExpenses}=Store.data;
   let list=[...transactions];
   if(financeFilter!=='all') list = list.filter(t=>t.type===financeFilter);
-  if(financeFilter==='receita' && financeClientSearch.trim()) list = list.filter(t=>(t.clientName||'').toLowerCase().includes(financeClientSearch.trim().toLowerCase()));
+  if(financeFilter==='receita' && financeClientSearch.trim()) list = list.filter(t=>normalizeSearch(t.clientName).includes(normalizeSearch(financeClientSearch)));
   const FINANCE_SORT_VALUE = {
     date: t=> t.date||'',
     description: t=> t.description||'',
@@ -3812,7 +3815,7 @@ function renderWhatsapp(root, actions){
 
   const filtered = withPhone.filter(c=>{
     if(waTierFilter!=='all' && (c.tier||'nenhum')!==waTierFilter) return false;
-    if(waSearch && !(c.name||'').toLowerCase().includes(waSearch.toLowerCase())) return false;
+    if(waSearch && !normalizeSearch(c.name).includes(normalizeSearch(waSearch))) return false;
     return true;
   }).sort((a,b)=>(a.name||'').localeCompare(b.name||'', 'pt-BR'));
 
@@ -4248,7 +4251,7 @@ function renderAssessments(root, actions){
 
   if(!assessClientId){
     actions.innerHTML = clients.length>0 ? `<button class="btn btn-primary" id="btn-new-assess-global">${icon('plus')}<span>Nova avaliação</span></button>` : '';
-    const list = clients.filter(c=> (c.name||'').toLowerCase().includes(assessSearch.toLowerCase()));
+    const list = clients.filter(c=> normalizeSearch(c.name).includes(normalizeSearch(assessSearch)));
     const byClient = {};
     assessments.forEach(a=>{ (byClient[a.clientId] || (byClient[a.clientId]=[])).push(a); });
     const enriched = list.map(c=>{
