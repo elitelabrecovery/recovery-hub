@@ -4307,6 +4307,266 @@ function measureLabel(m){
   return `${m.bodyPart||'—'}${side} — ${m.parameter||'—'}`;
 }
 
+/* ===== Dinamometria: upload de relatório (PDF) + comparação entre relatórios ===== */
+FICHA_TEMPLATES.dinamometria = { id:'dinamometria', label:'Relatório de Dinamometria' };
+let assessDynExcluded = new Set();
+
+function loadPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if(window.__pdfjsLoading) return window.__pdfjsLoading;
+  window.__pdfjsLoading = new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = ()=>{
+      try{
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        resolve(window.pdfjsLib);
+      }catch(e){ reject(e); }
+    };
+    s.onerror = ()=>{ window.__pdfjsLoading = null; reject(new Error('Não foi possível carregar o leitor de PDF. Verifique a conexão.')); };
+    document.head.appendChild(s);
+  });
+  return window.__pdfjsLoading;
+}
+
+async function extractPdfLines(arrayBuffer){
+  const pdfjsLib = await loadPdfJs();
+  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  const lines = [];
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    tc.items.forEach(it=>{ const t=(it.str||'').replace(/\s+/g,' ').trim(); if(t) lines.push(t); });
+    lines.push('\u0000PAGE');
+  }
+  return lines;
+}
+
+function dynNum(str){ const n = parseFloat(String(str).replace(',', '.')); return isFinite(n) ? n : null; }
+
+function parseDynamometryLines(lines){
+  const text = lines.filter(l=>l!=='\u0000PAGE').join('\n');
+  const out = { date:'', time:'', patientName:'', document:'', rows:[] };
+  const md = text.match(/Data:\s*(\d{2})\/(\d{2})\/(\d{4})/);
+  if(md) out.date = `${md[3]}-${md[2]}-${md[1]}`;
+  const mt = text.match(/Hora:\s*(\d{1,2}:\d{2})/);
+  if(mt) out.time = mt[1];
+  const mp = text.match(/Paciente:\s*([^\n,]+)/);
+  if(mp) out.patientName = mp[1].trim();
+  const mdoc = text.match(/Documento:\s*(\d+)/);
+  if(mdoc) out.document = mdoc[1];
+  // Bloco-resumo: <articulação> <movimento> D E <valor> kgf <valor> kgf [<assimetria>%]
+  const L = lines;
+  for(let i=2; i<L.length-3; i++){
+    if(L[i]==='D' && L[i+1]==='E'){
+      const a = L[i+2].match(/^([\d.,]+)\s*kgf$/i), b = L[i+3].match(/^([\d.,]+)\s*kgf$/i);
+      if(a && b){
+        const pct = (L[i+4]||'').match(/^([\d.,]+)\s*%$/);
+        out.rows.push({ joint:L[i-2], movement:L[i-1], right:dynNum(a[1]), left:dynNum(b[1]), reportAsym: pct?dynNum(pct[1]):null });
+      }
+    }
+  }
+  return out;
+}
+
+function dynAsym(r, l){
+  if(r==null || l==null || !isFinite(r) || !isFinite(l)) return null;
+  const mx = Math.max(r,l); if(mx<=0) return null;
+  return Math.abs(r-l)/mx*100;
+}
+function dynAsymClass(p){
+  if(p==null) return {label:'—', cls:'muted'};
+  if(p<=10) return {label:'Leve', cls:'good'};
+  if(p<=15) return {label:'Moderada', cls:'warn'};
+  return {label:'Alta', cls:'bad'};
+}
+function dynRowsToMeasurements(rows){
+  const ms = [];
+  rows.forEach(r=>{
+    if(r.right!=null) ms.push({bodyPart:r.joint, side:'D', parameter:`${r.movement} (dinamometria)`, value:r.right, unit:'kgf'});
+    if(r.left!=null) ms.push({bodyPart:r.joint, side:'E', parameter:`${r.movement} (dinamometria)`, value:r.left, unit:'kgf'});
+  });
+  return ms;
+}
+
+function openDynamometryModal(client, existing, prefill){
+  const isEdit = !!existing;
+  const base = existing ? {
+    date: existing.date||todayISO(), time: existing.reportTime||'', patientName: existing.reportPatientName||'',
+    rows: (existing.dynRows||[]).map(r=>({...r})), pdf: existing.reportPdf||null, fileName: existing.reportFileName||''
+  } : (prefill || {date:todayISO(), time:'', patientName:'', rows:[], pdf:null, fileName:''});
+  const state = { date:base.date, time:base.time, patientName:base.patientName, rows:base.rows, pdf:base.pdf, fileName:base.fileName, notes: existing?.notes||'' };
+  const hasData = isEdit || state.rows.length>0;
+
+  const draw = (m)=>{
+    const nameWarn = state.patientName && normalizeSearch(state.patientName)!==normalizeSearch(client.name)
+      ? `<div class="hint" style="color:var(--warn,#b45309);margin-top:6px;">⚠ O nome no relatório ("${escapeHtml(state.patientName)}") é diferente do cliente selecionado ("${escapeHtml(client.name)}"). Confirme que é o relatório certo.</div>` : '';
+    m.querySelector('.modal').innerHTML = `
+      <div class="modal-head"><h3>${isEdit?'Editar':'Relatório de dinamometria'} — ${escapeHtml(client.name)}</h3><button class="btn btn-ghost icon-btn" data-close-modal>${icon('close')}</button></div>
+      <div class="modal-body">
+        ${!isEdit ? `<div class="field"><label>Arquivo do relatório (PDF)</label>
+          <input type="file" id="dyn-file" accept="application/pdf,.pdf"/>
+          <div class="hint" id="dyn-status">${state.rows.length? `Lido: ${escapeHtml(state.fileName)} — confira os dados abaixo antes de salvar.` : 'Selecione o PDF gerado pelo dinamômetro. Os valores são lidos no seu navegador e você confirma antes de salvar.'}</div>${nameWarn}</div>` : nameWarn}
+        ${(hasData||state.rows.length) ? `
+        <div class="field-row" style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div class="field" style="flex:1;min-width:140px;"><label>Data do relatório</label><input type="date" id="dyn-date" value="${escapeHtml(state.date)}"/></div>
+          <div class="field" style="flex:1;min-width:120px;"><label>Hora</label><input type="text" id="dyn-time" value="${escapeHtml(state.time)}" placeholder="17:00"/></div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Articulação</th><th>Movimento</th><th>D (kgf)</th><th>E (kgf)</th><th>Assimetria</th><th></th></tr></thead>
+          <tbody>${state.rows.map((r,i)=>{ const p=dynAsym(r.right,r.left); return `<tr>
+            <td><input data-k="joint" data-i="${i}" value="${escapeHtml(r.joint||'')}" style="min-width:90px;"/></td>
+            <td><input data-k="movement" data-i="${i}" value="${escapeHtml(r.movement||'')}" style="min-width:90px;"/></td>
+            <td><input data-k="right" data-i="${i}" inputmode="decimal" value="${r.right==null?'':r.right}" style="width:80px;"/></td>
+            <td><input data-k="left" data-i="${i}" inputmode="decimal" value="${r.left==null?'':r.left}" style="width:80px;"/></td>
+            <td class="tnum" id="dyn-asym-${i}">${p==null?'—':p.toFixed(1)+'%'}</td>
+            <td><button class="btn btn-ghost icon-btn btn-danger" data-rm="${i}">${icon('trash')}</button></td></tr>`; }).join('')}</tbody>
+        </table></div>
+        <div style="margin-top:8px;"><button class="btn btn-sm" id="dyn-add-row">${icon('plus')}Adicionar linha</button></div>
+        <div class="field" style="margin-top:12px;"><label>Observações</label><textarea id="dyn-notes" rows="2">${escapeHtml(state.notes)}</textarea></div>` : ''}
+      </div>
+      <div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button>${hasData||state.rows.length?`<button class="btn btn-primary" id="dyn-save">${icon('check')}Salvar relatório</button>`:''}</div>`;
+    m.querySelectorAll('[data-close-modal]').forEach(b=>b.addEventListener('click', closeModal));
+    const fileEl = m.querySelector('#dyn-file');
+    if(fileEl) fileEl.addEventListener('change', async ()=>{
+      const f = fileEl.files && fileEl.files[0]; if(!f) return;
+      const st = m.querySelector('#dyn-status'); st.textContent = 'Lendo o PDF...';
+      try{
+        const buf = await f.arrayBuffer();
+        const parsed = parseDynamometryLines(await extractPdfLines(buf.slice(0)));
+        if(!parsed.rows.length){ st.textContent = 'Não encontrei medições neste PDF. Você pode preencher manualmente abaixo.'; parsed.rows.push({joint:'',movement:'',right:null,left:null}); }
+        state.date = parsed.date || state.date; state.time = parsed.time||''; state.patientName = parsed.patientName||'';
+        state.rows = parsed.rows; state.fileName = f.name; state.pdf = null;
+        if(f.size <= 600*1024){
+          state.pdf = await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(f); });
+        }
+        const dupe = (Store.data.assessments||[]).some(a=>a.clientId===client.id && a.fichaType==='dinamometria' && a.date===state.date && (a.reportTime||'')===state.time);
+        draw(m);
+        if(dupe) showToast('Atenção: já existe um relatório deste cliente com a mesma data e hora.');
+      }catch(e){ console.error(e); st.textContent = 'Erro ao ler o PDF: '+(e.message||e)+'. Você pode preencher manualmente.'; if(!state.rows.length){ state.rows=[{joint:'',movement:'',right:null,left:null}]; draw(m); } }
+    });
+    m.querySelectorAll('input[data-k]').forEach(inp=>inp.addEventListener('input', ()=>{
+      const i = +inp.dataset.i, k = inp.dataset.k, r = state.rows[i];
+      r[k] = (k==='right'||k==='left') ? dynNum(inp.value) : inp.value;
+      const p = dynAsym(r.right, r.left); const c = m.querySelector('#dyn-asym-'+i); if(c) c.textContent = p==null?'—':p.toFixed(1)+'%';
+    }));
+    m.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click', ()=>{ syncMeta(m); state.rows.splice(+b.dataset.rm,1); draw(m); }));
+    const addBtn = m.querySelector('#dyn-add-row'); if(addBtn) addBtn.addEventListener('click', ()=>{ syncMeta(m); state.rows.push({joint:'',movement:'',right:null,left:null}); draw(m); });
+    const saveBtn = m.querySelector('#dyn-save');
+    if(saveBtn) saveBtn.addEventListener('click', async ()=>{
+      syncMeta(m);
+      const rows = state.rows.filter(r=>(r.joint||'').trim() && (r.movement||'').trim() && (r.right!=null || r.left!=null));
+      if(!state.date){ showToast('Informe a data do relatório'); return; }
+      if(!rows.length){ showToast('Preencha ao menos uma linha com articulação, movimento e valor'); return; }
+      rows.forEach(r=>{ r.joint=r.joint.trim(); r.movement=r.movement.trim(); r.asymPct = dynAsym(r.right,r.left); });
+      const payload = { clientId:client.id, clientName:client.name, fichaType:'dinamometria', date:state.date, reportTime:state.time||'',
+        reportPatientName:state.patientName||'', reportFileName:state.fileName||'', dynRows:rows, measurements:dynRowsToMeasurements(rows),
+        notes:state.notes||'', photos:[] };
+      if(state.pdf) payload.reportPdf = state.pdf;
+      saveBtn.disabled = true;
+      try{
+        if(isEdit) await Store.update('assessments', existing.id, payload); else await Store.add('assessments', payload);
+        closeModal(); showToast(isEdit?'Relatório atualizado':'Relatório salvo');
+      }catch(e){ console.error(e); saveBtn.disabled=false; showToast('Não foi possível salvar. Verifique a conexão e tente de novo.'); }
+    });
+  };
+  function syncMeta(m){
+    const d=m.querySelector('#dyn-date'), t=m.querySelector('#dyn-time'), n=m.querySelector('#dyn-notes');
+    if(d) state.date=d.value; if(t) state.time=t.value; if(n) state.notes=n.value;
+  }
+  openModal('', m=>draw(m), {wide:true});
+}
+
+function buildDynGroupedBarSVG(points){
+  const n = points.length, groupW = 70, padL = 40, padR = 12, padT = 22, padB = 30, H = 200;
+  const W = Math.max(360, padL + padR + n*groupW);
+  const maxV = Math.max(1, ...points.flatMap(p=>[p.right||0, p.left||0])) * 1.15;
+  const innerH = H-padT-padB, y = v => padT + innerH - (v/maxV)*innerH, bw = 20;
+  const bars = points.map((p,i)=>{
+    const cx = padL + i*groupW + groupW/2;
+    const bar = (v, dx, fill)=> v==null ? '' : `<rect x="${(cx+dx).toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw}" height="${(padT+innerH-y(v)).toFixed(1)}" fill="${fill}" rx="2"/><text x="${(cx+dx+bw/2).toFixed(1)}" y="${(y(v)-4).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">${v}</text>`;
+    return bar(p.right,-bw-1,'var(--accent)') + bar(p.left,1,'var(--muted)') + `<text x="${cx.toFixed(1)}" y="${H-10}" text-anchor="middle" font-size="10" fill="var(--muted)">${fmtDateShort(p.date)}</text>`;
+  }).join('');
+  return `<div style="overflow-x:auto;"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;">
+    <line x1="${padL}" y1="${padT+innerH}" x2="${W-padR}" y2="${padT+innerH}" stroke="var(--border)"/>${bars}</svg></div>
+    <div class="muted" style="font-size:11px;margin-top:4px;"><span style="color:var(--accent);">■</span> Direito (D) &nbsp; <span style="color:var(--muted);">■</span> Esquerdo (E) — kgf</div>`;
+}
+
+function buildDynCompareHtml(client, dynList){
+  if(dynList.length===0) return `<div class="empty">${icon('ranking')}<p>Envie o primeiro relatório de dinamometria deste cliente. Depois, a cada novo envio, a comparação aparece aqui.</p></div>`;
+  const included = dynList.filter(a=>!assessDynExcluded.has(a.id)).sort((a,b)=>(a.date||'').localeCompare(b.date||'') || (a.reportTime||'').localeCompare(b.reportTime||''));
+  const picker = `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">${dynList.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(a=>`
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" data-dyn-pick="${a.id}" ${assessDynExcluded.has(a.id)?'':'checked'}/> ${fmtDate(a.date)}${a.reportTime?' '+escapeHtml(a.reportTime):''}</label>`).join('')}</div>`;
+  if(included.length<2) return picker + `<div class="empty">${icon('ranking')}<p>${dynList.length<2?'Há 1 relatório. Envie outro para gerar a comparação.':'Selecione pelo menos 2 relatórios para comparar.'}</p></div>`;
+  const groups = {};
+  included.forEach(a=>(a.dynRows||[]).forEach(r=>{ const k=`${r.joint}|${r.movement}`; (groups[k]||(groups[k]=[])).push({date:a.date, time:a.reportTime||'', right:r.right, left:r.left}); }));
+  const fmtDelta = (cur, prev)=>{ if(cur==null||prev==null||prev===0) return '—'; const d=(cur-prev)/prev*100; return `<span style="color:${d>=0?'var(--good,#15803d)':'var(--bad,#b91c1c)'}">${d>=0?'+':''}${d.toFixed(1)}%</span>`; };
+  return picker + Object.keys(groups).map(k=>{
+    const [joint, mov] = k.split('|'); const pts = groups[k];
+    if(pts.length<2) return `<div class="muted" style="margin:10px 0;font-size:13px;">${escapeHtml(joint)} — ${escapeHtml(mov)}: só aparece em 1 dos relatórios selecionados.</div>`;
+    const first = pts[0], last = pts[pts.length-1];
+    const aF = dynAsym(first.right,first.left), aL = dynAsym(last.right,last.left);
+    return `<div style="margin:18px 0 6px;"><strong>${escapeHtml(joint)} — ${escapeHtml(mov)}</strong>
+      <div class="muted" style="font-size:12px;">Do primeiro ao último: D ${fmtDelta(last.right,first.right)} · E ${fmtDelta(last.left,first.left)} · assimetria ${aF==null?'—':aF.toFixed(1)+'%'} → ${aL==null?'—':aL.toFixed(1)+'%'}</div></div>
+      ${buildDynGroupedBarSVG(pts)}
+      <div class="table-wrap" style="margin-top:8px;"><table><thead><tr><th>Data</th><th>D (kgf)</th><th>E (kgf)</th><th>Assimetria</th><th>Classificação</th><th>Δ D</th><th>Δ E</th></tr></thead><tbody>${pts.map((p,i)=>{ const as=dynAsym(p.right,p.left), c=dynAsymClass(as); const prev=i>0?pts[i-1]:null; return `<tr>
+        <td class="tnum cell-strong">${fmtDate(p.date)}${p.time?' '+escapeHtml(p.time):''}</td><td class="tnum">${p.right==null?'—':p.right}</td><td class="tnum">${p.left==null?'—':p.left}</td>
+        <td class="tnum">${as==null?'—':as.toFixed(1)+'%'}</td><td><span class="badge ${c.cls}">${c.label}</span></td>
+        <td class="tnum">${prev?fmtDelta(p.right,prev.right):'—'}</td><td class="tnum">${prev?fmtDelta(p.left,prev.left):'—'}</td></tr>`; }).join('')}</tbody></table></div>`;
+  }).join('');
+}
+
+async function exportDynConsolidatedPdf(client, dynList){
+  if(typeof window.jspdf === 'undefined'){ showToast('Biblioteca de exportação não carregou. Verifique sua conexão e tente novamente.'); return; }
+  const list = dynList.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'') || (a.reportTime||'').localeCompare(b.reportTime||''));
+  if(list.length===0){ showToast('Nenhum relatório de dinamometria para exportar'); return; }
+  const doc = new window.jspdf.jsPDF();
+  const pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight(), mx = 14, accent = [232,92,13];
+  let y = 18;
+  try{ const d = await loadLogoDims(); const w = 34, h = w*(d.h/d.w); doc.addImage(APP_LOGO_PNG,'PNG',mx,y-6,w,h); y += h+2; }catch(e){}
+  doc.setFontSize(15); doc.setFont(undefined,'bold'); doc.text('Relatório consolidado de dinamometria', mx, y); y += 7;
+  doc.setFontSize(10); doc.setFont(undefined,'normal'); doc.setTextColor(90);
+  doc.text(`Cliente: ${client.name}`, mx, y); y += 5;
+  doc.text(`${list.length} relatório(s) de ${fmtDate(list[0].date)} a ${fmtDate(list[list.length-1].date)} — gerado em ${fmtDate(todayISO())}`, mx, y); y += 8; doc.setTextColor(0);
+  const groups = {};
+  list.forEach(a=>(a.dynRows||[]).forEach(r=>{ const k=`${r.joint}|${r.movement}`; (groups[k]||(groups[k]=[])).push({date:a.date, time:a.reportTime||'', right:r.right, left:r.left}); }));
+  const pct = (cur, prev)=> (cur==null||prev==null||prev===0) ? '—' : (((cur-prev)/prev*100>=0?'+':'')+((cur-prev)/prev*100).toFixed(1)+'%');
+  const need = n=>{ if(y+n>pageH-16){ doc.addPage(); y=18; } };
+  Object.keys(groups).forEach(k=>{
+    const [joint, mov] = k.split('|'); const pts = groups[k];
+    need(70);
+    doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.setTextColor(accent[0],accent[1],accent[2]); doc.text(`${joint} — ${mov}`, mx, y);
+    doc.setDrawColor(accent[0],accent[1],accent[2]); doc.line(mx, y+2, pageW-mx, y+2); doc.setTextColor(0); doc.setFont(undefined,'normal'); y += 8;
+    if(pts.length>=2){
+      const f = pts[0], l = pts[pts.length-1], aF = dynAsym(f.right,f.left), aL = dynAsym(l.right,l.left);
+      doc.setFontSize(9.5);
+      doc.text(`Evolução do primeiro ao último: D ${pct(l.right,f.right)} · E ${pct(l.left,f.left)} · assimetria ${aF==null?'—':aF.toFixed(1)+'%'} → ${aL==null?'—':aL.toFixed(1)+'%'}`, mx, y); y += 6;
+    }
+    // gráfico de barras D x E
+    const chartH = 38, chartW = pageW-2*mx, maxV = Math.max(1, ...pts.flatMap(p=>[p.right||0,p.left||0]))*1.15;
+    const gw = chartW/pts.length, bw = Math.min(14, gw/3.2), base = y+chartH;
+    doc.setDrawColor(200); doc.line(mx, base, mx+chartW, base);
+    pts.forEach((p,i)=>{
+      const cx = mx + i*gw + gw/2;
+      [[p.right,-bw-0.5,accent],[p.left,0.5,[130,130,130]]].forEach(([v,dx,col])=>{
+        if(v==null) return; const bh = v/maxV*(chartH-6);
+        doc.setFillColor(col[0],col[1],col[2]); doc.rect(cx+dx, base-bh, bw, bh, 'F');
+        doc.setFontSize(7.5); doc.setTextColor(30); doc.text(String(v), cx+dx+bw/2, base-bh-1.2, {align:'center'});
+      });
+      doc.setFontSize(7.5); doc.setTextColor(110); doc.text(fmtDate(p.date), cx, base+4.5, {align:'center'});
+    });
+    doc.setTextColor(0); y = base + 9;
+    doc.autoTable({ startY:y, margin:{left:mx,right:mx}, styles:{fontSize:9}, headStyles:{fillColor:accent},
+      head:[['Data','D (kgf)','E (kgf)','Assimetria','Classificação','Δ D','Δ E']],
+      body: pts.map((p,i)=>{ const a=dynAsym(p.right,p.left), pr=i>0?pts[i-1]:null; return [fmtDate(p.date)+(p.time?' '+p.time:''), p.right==null?'—':p.right, p.left==null?'—':p.left, a==null?'—':a.toFixed(1)+'%', dynAsymClass(a).label, pr?pct(p.right,pr.right):'—', pr?pct(p.left,pr.left):'—']; }) });
+    y = doc.lastAutoTable.finalY + 10;
+  });
+  need(20); doc.setFontSize(8); doc.setTextColor(120);
+  doc.text('Assimetria = |D − E| / maior valor. Classificação: até 10% leve, 10–15% moderada, acima de 15% alta (referência dos relatórios do aparelho). Δ = variação em relação ao relatório anterior.', mx, y, {maxWidth:pageW-2*mx});
+  const n = doc.getNumberOfPages(); for(let i=1;i<=n;i++){ doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120); doc.text(`Página ${i} de ${n}`, pageW-mx, pageH-8, {align:'right'}); }
+  doc.save(`dinamometria-${(client.name||'cliente').toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${todayISO()}.pdf`);
+}
+
 function openFichaPicker(client){
   const opts = ['rapida','mmss','mmii','livre'];
   openModal(`
@@ -4412,7 +4672,7 @@ function renderAssessments(root, actions){
       }, 150);
     });
     bindSortHeaders(root, assessListSort, ()=>renderAssessments(root,actions));
-    root.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click', ()=>{ assessClientId=b.dataset.open; assessCompareKey=null; renderAssessments(root,actions); }));
+    root.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click', ()=>{ assessClientId=b.dataset.open; assessCompareKey=null; assessDynExcluded=new Set(); renderAssessments(root,actions); }));
     root.querySelectorAll('[data-new]').forEach(b=>b.addEventListener('click', ()=>{
       const c = clients.find(x=>x.id===b.dataset.new);
       if(c) openFichaPicker(c);
@@ -4426,8 +4686,9 @@ function renderAssessments(root, actions){
   if(!client){ assessClientId=null; renderAssessments(root,actions); return; }
   const own = assessments.filter(a=>a.clientId===assessClientId).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
-  actions.innerHTML = `<button class="btn" id="btn-email-assess" ${own.length===0?'disabled':''}>${icon('mail')}<span>Enviar por e-mail</span></button><button class="btn btn-primary" id="btn-new-assess">${icon('plus')}<span>Nova avaliação</span></button>`;
+  actions.innerHTML = `<button class="btn" id="btn-dyn-upload">${icon('plus')}<span>Dinamometria (PDF)</span></button><button class="btn" id="btn-email-assess" ${own.length===0?'disabled':''}>${icon('mail')}<span>Enviar por e-mail</span></button><button class="btn btn-primary" id="btn-new-assess">${icon('plus')}<span>Nova avaliação</span></button>`;
   actions.querySelector('#btn-new-assess').addEventListener('click', ()=>openFichaPicker(client));
+  actions.querySelector('#btn-dyn-upload').addEventListener('click', ()=>openDynamometryModal(client, null));
   const emailBtn = actions.querySelector('#btn-email-assess');
   if(emailBtn) emailBtn.addEventListener('click', ()=>openSendAssessmentsEmailModal(client, own));
 
@@ -4436,6 +4697,7 @@ function renderAssessments(root, actions){
   const keyOptions = Object.keys(keyCount).sort((a,b)=>keyCount[b]-keyCount[a]);
   if(!assessCompareKey || !keyOptions.includes(assessCompareKey)) assessCompareKey = keyOptions[0]||null;
 
+  const dynOwn = own.filter(a=>a.fichaType==='dinamometria');
   let chartHtml = `<div class="empty">${icon('ranking')}<p>Registre pelo menos 2 avaliações com o mesmo segmento/parâmetro para ver a evolução em gráfico.</p></div>`;
   if(assessCompareKey){
     const [bp,side,param] = assessCompareKey.split('|');
@@ -4464,6 +4726,13 @@ function renderAssessments(root, actions){
       <div class="card-body">${chartHtml}</div>
     </div>
 
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-head"><h3>Dinamometria — comparação entre relatórios</h3>
+        <div class="flex gap10"><button class="btn btn-sm" id="dyn-upload-inline">${icon('plus')}<span>Enviar relatório (PDF)</span></button>
+        <button class="btn btn-sm btn-primary" id="dyn-export-all" ${dynOwn.length===0?'disabled':''}>${icon('download')}<span>Gerar relatório consolidado</span></button></div></div>
+      <div class="card-body">${buildDynCompareHtml(client, dynOwn)}</div>
+    </div>
+
     <div class="card">
       <div class="card-head"><h3>Histórico de avaliações</h3></div>
       <div class="card-body tight">
@@ -4488,6 +4757,9 @@ function renderAssessments(root, actions){
   `;
 
   root.querySelector('#assess-back').addEventListener('click', ()=>{ assessClientId=null; renderAssessments(root,actions); });
+  root.querySelector('#dyn-upload-inline').addEventListener('click', ()=>openDynamometryModal(client, null));
+  root.querySelector('#dyn-export-all').addEventListener('click', ()=>exportDynConsolidatedPdf(client, dynOwn.filter(a=>!assessDynExcluded.has(a.id)).length>=1 ? dynOwn.filter(a=>!assessDynExcluded.has(a.id)) : dynOwn));
+  root.querySelectorAll('[data-dyn-pick]').forEach(cb=>cb.addEventListener('change', ()=>{ if(cb.checked) assessDynExcluded.delete(cb.dataset.dynPick); else assessDynExcluded.add(cb.dataset.dynPick); renderAssessments(root,actions); }));
   const compareSel = root.querySelector('#assess-compare-select');
   if(compareSel) compareSel.addEventListener('change', e=>{ assessCompareKey=e.target.value; renderAssessments(root,actions); });
   root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openAssessmentForm(client, own.find(a=>a.id===b.dataset.edit))));
@@ -4907,6 +5179,7 @@ function buildLineChartSVG(points){
 
 function openAssessmentForm(client, existing, fichaTypeParam){
   const fichaType = fichaTypeParam || (existing && existing.fichaType) || 'livre';
+  if(fichaType === 'dinamometria'){ return openDynamometryModal(client, existing); }
   if(fichaType === 'mmss' || fichaType === 'mmii'){ return openRichFichaForm(client, existing, fichaType); }
   if(fichaType !== 'livre'){ return openFichaAssessmentForm(client, existing, fichaType); }
 
