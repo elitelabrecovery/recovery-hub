@@ -3414,6 +3414,10 @@ function renderFinance(root, actions){
   // Faturamento x Despesas — período editável (padrão: últimos 12 meses)
   if(!financeChartTo) financeChartTo = currentMonthKey();
   if(!financeChartFrom) financeChartFrom = shiftMonthKey(financeChartTo, -11);
+  // O período escolhido no gráfico também filtra a tabela de lançamentos (Todos / Receitas / Despesas)
+  const finPeriodLo = financeChartFrom<=financeChartTo ? financeChartFrom : financeChartTo;
+  const finPeriodHi = financeChartFrom<=financeChartTo ? financeChartTo : financeChartFrom;
+  list = list.filter(t=>{ const mk=monthKey(t.date); return mk && mk>=finPeriodLo && mk<=finPeriodHi; });
   const months = monthRangeKeys(financeChartFrom, financeChartTo).slice(-36); // trava em 36 meses pra não estourar o gráfico
   const monthLabels = months.map(m=> new Date(m+'-02').toLocaleDateString('pt-BR',{month:'short', year: months.length>12?'2-digit':undefined}).replace('.',''));
   const monthRev = months.map(m=> transactions.filter(t=>t.type==='receita'&&monthKey(t.date)===m).reduce((s,t)=>s+Number(t.amount||0),0));
@@ -3447,6 +3451,7 @@ function renderFinance(root, actions){
             <button class="btn btn-sm" data-chart-preset="6">6 meses</button>
             <button class="btn btn-sm" data-chart-preset="12">12 meses</button>
             <button class="btn btn-sm" data-chart-preset="24">24 meses</button>
+            <button class="btn btn-sm" id="fin-chart-all">Desde o início</button>
           <button class="btn btn-sm" id="fin-chart-current">Mês atual</button>
 </div>
         </div>
@@ -3509,7 +3514,7 @@ function renderFinance(root, actions){
     ) : ''}
     <div class="card" style="margin-top:14px;">
       <div class="card-body tight">
-        ${list.length===0? `<div class="empty">${icon('cash')}<p>Nenhum lançamento registrado.</p></div>` :
+        ${list.length===0? `<div class="empty">${icon('cash')}<p>Nenhum lançamento registrado no período selecionado.</p></div>` :
         `<div class="table-wrap"><table>
           <thead><tr>${thSort('Data','date',financeSort)}${thSort('Valor','amount',financeSort)}${thSort('Tipo','type',financeSort)}${thSort('Descrição','description',financeSort)}${thSort('Cliente','clientName',financeSort)}${thSort('Categoria','category',financeSort)}<th></th></tr></thead>
           <tbody>${list.map(t=>`
@@ -3544,6 +3549,13 @@ function renderFinance(root, actions){
     financeChartFrom = shiftMonthKey(financeChartTo, -(n-1));
     renderFinance(root,actions);
   }));
+const finChartAllBtn = root.querySelector('#fin-chart-all');
+if(finChartAllBtn) finChartAllBtn.addEventListener('click', ()=>{
+  const keys = Store.data.transactions.map(t=>monthKey(t.date)).filter(Boolean).sort();
+  financeChartTo = currentMonthKey();
+  financeChartFrom = keys.length && keys[0]<financeChartTo ? keys[0] : financeChartTo;
+  renderFinance(root,actions);
+});
 const finChartCurrentBtn = root.querySelector('#fin-chart-current');
 if(finChartCurrentBtn) finChartCurrentBtn.addEventListener('click', ()=>{
 financeChartTo = currentMonthKey();
