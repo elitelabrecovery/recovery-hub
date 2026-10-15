@@ -2413,26 +2413,35 @@ function renderServices(root, actions){
   actions.innerHTML = `<button class="btn btn-primary" id="btn-new-service">${icon('plus')}<span>Novo serviço</span></button>`;
   actions.querySelector('#btn-new-service').addEventListener('click', ()=>openServiceForm());
 
-  const {services, appointments} = Store.data;
-  const q = normalizeSearch(serviceSearch);
-  const list = services.filter(s=> normalizeSearch(s.name).includes(q) || normalizeSearch(s.category).includes(q));
-
-  const enriched = list.map(s=> ({s, count: appointments.filter(a=>a.serviceId===s.id && a.status==='concluido').length}));
-  const SERVICE_SORT_VALUE = {
-    name: e=> e.s.name||'',
-    category: e=> e.s.category||'',
-    duration: e=> Number(e.s.duration)||0,
-    price: e=> Number(e.s.price)||0,
-    count: e=> e.count,
-    status: e=> e.s.active===false ? 'Inativo' : 'Ativo',
-  };
-  enriched.sort((a,b)=> compareBy(serviceSort.dir, SERVICE_SORT_VALUE[serviceSort.key](a), SERVICE_SORT_VALUE[serviceSort.key](b)));
-
+  /* Casca fixa: o campo de busca NUNCA é recriado ao digitar (evita perda de foco/teclado no mobile). */
   root.innerHTML = `
     <div class="filter-bar">
-      <div class="search-input">${icon('search')}<input id="service-search" placeholder="Buscar por nome ou categoria" value="${escapeHtml(serviceSearch)}"/></div>
-      <span class="muted" style="font-size:12.5px;">${enriched.length} de ${services.length} serviço(s)</span>
+      <div class="search-input">${icon('search')}<input id="service-search" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Buscar por nome ou categoria" value="${escapeHtml(serviceSearch)}"/></div>
+      <span class="muted" id="service-count" style="font-size:12.5px;"></span>
     </div>
+    <div id="service-results"></div>
+  `;
+
+  function paintServiceResults(){
+    const {services, appointments} = Store.data;
+    const q = normalizeSearch(serviceSearch);
+    const list = services.filter(s=> normalizeSearch(s.name).includes(q) || normalizeSearch(s.category).includes(q));
+
+    const doneCount = {};
+    appointments.forEach(a=>{ if(a.status==='concluido' && a.serviceId) doneCount[a.serviceId]=(doneCount[a.serviceId]||0)+1; });
+    const enriched = list.map(s=> ({s, count: doneCount[s.id]||0}));
+    const SERVICE_SORT_VALUE = {
+      name: e=> e.s.name||'',
+      category: e=> e.s.category||'',
+      duration: e=> Number(e.s.duration)||0,
+      price: e=> Number(e.s.price)||0,
+      count: e=> e.count,
+      status: e=> e.s.active===false ? 'Inativo' : 'Ativo',
+    };
+    enriched.sort((a,b)=> compareBy(serviceSort.dir, SERVICE_SORT_VALUE[serviceSort.key](a), SERVICE_SORT_VALUE[serviceSort.key](b)));
+
+    root.querySelector('#service-count').textContent = `${enriched.length} de ${services.length} serviço(s)`;
+    root.querySelector('#service-results').innerHTML = `
     <div class="card">
       <div class="card-body tight">
         ${services.length===0 ? `<div class="empty">${icon('services')}<p>Nenhum serviço cadastrado ainda.</p></div>` :
@@ -2456,14 +2465,21 @@ function renderServices(root, actions){
         </table></div>`}
       </div>
     </div>
-  `;
+    `;
+    bindSortHeaders(root, serviceSort, ()=>renderServices(root,actions));
+    root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openServiceForm(services.find(s=>s.id===b.dataset.edit))));
+    root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
+      if(confirm('Remover este serviço do catálogo?')){ Store.remove('services', b.dataset.del); showToast('Serviço removido'); }
+    }));
+  }
+  paintServiceResults();
+
   const searchEl = root.querySelector('#service-search');
-  if(searchEl) searchEl.addEventListener('input', e=>{ serviceSearch=e.target.value; renderServices(root,actions); searchEl.focus(); searchEl.selectionStart=searchEl.selectionEnd=searchEl.value.length; });
-  bindSortHeaders(root, serviceSort, ()=>renderServices(root,actions));
-  root.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openServiceForm(services.find(s=>s.id===b.dataset.edit))));
-  root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
-    if(confirm('Remover este serviço do catálogo?')){ Store.remove('services', b.dataset.del); showToast('Serviço removido'); }
-  }));
+  if(searchEl) searchEl.addEventListener('input', e=>{
+    serviceSearch=e.target.value;
+    clearTimeout(window.__serviceSearchDebounce);
+    window.__serviceSearchDebounce=setTimeout(paintServiceResults, 120);
+  });
 }
 
 function openServiceForm(existing){
@@ -3969,11 +3985,24 @@ function renderWhatsapp(root, actions){
   if(waSelected===null){ waSelected = new Set(withPhone.filter(c=>c.status!=='inativo').map(c=>c.id)); }
   const noPhoneCount = clients.length - withPhone.length;
 
-  const filtered = withPhone.filter(c=>{
+  const computeFiltered = ()=> withPhone.filter(c=>{
     if(waTierFilter!=='all' && (c.tier||'nenhum')!==waTierFilter) return false;
     if(waSearch && !normalizeSearch(c.name).includes(normalizeSearch(waSearch))) return false;
     return true;
   }).sort((a,b)=>(a.name||'').localeCompare(b.name||'', 'pt-BR'));
+  let filtered = computeFiltered();
+  const waListHtml = ()=> filtered.length===0? `<div class="empty">${icon('users')}<p>Nenhum cliente encontrado.</p></div>` :
+    `<table>
+      <tbody>${filtered.map(c=>{
+        const tier=CLIENT_TIERS[c.tier];
+        const checked = waSelected.has(c.id);
+        return `<tr>
+          <td style="width:30px;"><input type="checkbox" class="wa-check" data-id="${c.id}" ${checked?'checked':''} style="width:auto;"/></td>
+          <td class="flex gap10"><div class="avatar">${initials(c.name)}</div><div><div class="cell-strong">${escapeHtml(c.name)}</div><div class="muted" style="font-size:11px;">${escapeHtml(c.phone)}</div></div></td>
+          <td>${tier?`<span class="badge ${tier.cls}">${tier.label}</span>`:''}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
 
   root.innerHTML = `
     <div class="card" style="margin-bottom:16px;background:var(--surface-2);">
@@ -4004,7 +4033,7 @@ function renderWhatsapp(root, actions){
         <div class="card-head"><h3>Destinatários</h3><span class="muted" id="wa-count" style="font-size:12px;">${waSelected.size} selecionado(s)</span></div>
         <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
           <div class="filter-bar" style="margin-bottom:0;">
-            <div class="search-input" style="max-width:100%;flex:1;">${icon('search')}<input id="wa-search" placeholder="Buscar cliente" value="${escapeHtml(waSearch)}"/></div>
+            <div class="search-input" style="max-width:100%;flex:1;">${icon('search')}<input id="wa-search" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Buscar cliente" value="${escapeHtml(waSearch)}"/></div>
             <select id="wa-tier-filter" style="min-width:130px;">
               <option value="all" ${waTierFilter==='all'?'selected':''}>Todas categorias</option>
               <option value="ouro" ${waTierFilter==='ouro'?'selected':''}>Ouro</option>
@@ -4019,20 +4048,7 @@ function renderWhatsapp(root, actions){
             <button class="btn btn-sm btn-primary" id="wa-send-campaign" style="margin-left:auto;">${icon('whatsapp')}Enviar</button>
           </div>
           ${noPhoneCount>0?`<div class="muted" style="font-size:11.5px;">${noPhoneCount} cliente(s) sem telefone cadastrado não aparecem aqui.</div>`:''}
-          <div class="table-wrap" style="max-height:340px;overflow-y:auto;">
-            ${filtered.length===0? `<div class="empty">${icon('users')}<p>Nenhum cliente encontrado.</p></div>` :
-            `<table>
-              <tbody>${filtered.map(c=>{
-                const tier=CLIENT_TIERS[c.tier];
-                const checked = waSelected.has(c.id);
-                return `<tr>
-                  <td style="width:30px;"><input type="checkbox" class="wa-check" data-id="${c.id}" ${checked?'checked':''} style="width:auto;"/></td>
-                  <td class="flex gap10"><div class="avatar">${initials(c.name)}</div><div><div class="cell-strong">${escapeHtml(c.name)}</div><div class="muted" style="font-size:11px;">${escapeHtml(c.phone)}</div></div></td>
-                  <td>${tier?`<span class="badge ${tier.cls}">${tier.label}</span>`:''}</td>
-                </tr>`;
-              }).join('')}</tbody>
-            </table>`}
-          </div>
+          <div class="table-wrap" id="wa-list" style="max-height:340px;overflow-y:auto;">${waListHtml()}</div>
         </div>
       </div>
     </div>
@@ -4045,15 +4061,27 @@ function renderWhatsapp(root, actions){
     previewEl.textContent = waRender(filtered[0]?.name);
   });
   root.querySelector('#wa-send-campaign').addEventListener('click', ()=>waConfirmAndExport(root));
-  root.querySelector('#wa-search').addEventListener('input', e=>{ waSearch=e.target.value; renderWhatsapp(root,actions); root.querySelector('#wa-search').focus(); });
-  root.querySelector('#wa-tier-filter').addEventListener('change', e=>{ waTierFilter=e.target.value; renderWhatsapp(root,actions); });
-  root.querySelector('#wa-select-all').addEventListener('click', ()=>{ filtered.forEach(c=>waSelected.add(c.id)); renderWhatsapp(root,actions); });
-  root.querySelector('#wa-select-none').addEventListener('click', ()=>{ filtered.forEach(c=>waSelected.delete(c.id)); renderWhatsapp(root,actions); });
-  root.querySelectorAll('.wa-check').forEach(cb=>cb.addEventListener('change', ()=>{
+  const bindWaChecks = ()=> root.querySelectorAll('.wa-check').forEach(cb=>cb.addEventListener('change', ()=>{
     if(cb.checked) waSelected.add(cb.dataset.id); else waSelected.delete(cb.dataset.id);
     root.querySelector('#wa-count').textContent = waSelected.size+' selecionado(s)';
   }));
+  /* Busca: atualiza só a lista (o campo nunca é recriado -> sem perda de foco/teclado no mobile) */
+  root.querySelector('#wa-search').addEventListener('input', e=>{
+    waSearch=e.target.value;
+    clearTimeout(window.__waSearchDebounce);
+    window.__waSearchDebounce=setTimeout(()=>{
+      filtered = computeFiltered();
+      root.querySelector('#wa-list').innerHTML = waListHtml();
+      previewEl.textContent = waRender(filtered[0]?.name);
+      bindWaChecks();
+    }, 120);
+  });
+  root.querySelector('#wa-tier-filter').addEventListener('change', e=>{ waTierFilter=e.target.value; renderWhatsapp(root,actions); });
+  root.querySelector('#wa-select-all').addEventListener('click', ()=>{ filtered.forEach(c=>waSelected.add(c.id)); renderWhatsapp(root,actions); });
+  root.querySelector('#wa-select-none').addEventListener('click', ()=>{ filtered.forEach(c=>waSelected.delete(c.id)); renderWhatsapp(root,actions); });
+  bindWaChecks();
 }
+
 
 
 /* ---------- ASSESSMENTS (AVALIAÇÕES) ---------- */
