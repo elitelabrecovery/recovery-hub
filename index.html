@@ -2938,7 +2938,8 @@ let agendaMonthKey=null; // 'YYYY-MM'; null = current month
 let agendaSelectedDay=null; // ISO date selected in month view
 let agendaSortField=null; // column key for manual sort in Lista view
 let agendaSortDir='asc'; // 'asc' | 'desc'
-let agendaFilterDate=''; // ISO date filter used in Concluídos/Cancelados
+let agendaFilterDate=''; // data inicial (ou dia único, se 'Até' vazio) — Concluídos/Cancelados
+let agendaFilterDateTo=''; // data final do intervalo (opcional)
 let agendaClientFilter=''; // id do cliente selecionado no filtro de busca da Lista (todas as abas)
 
 function toISODate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
@@ -3047,7 +3048,12 @@ if(agendaFilter==='upcoming') list = list.filter(a=>a.date>=today && a.status===
 else if(agendaFilter==='today') list = list.filter(a=>a.date===today);
 else if(agendaFilter==='done') list = list.filter(a=>a.status==='concluido');
 else if(agendaFilter==='cancel') list = list.filter(a=>a.status==='cancelado'||a.status==='faltou');
-if((agendaFilter==='done'||agendaFilter==='cancel') && agendaFilterDate) list = list.filter(a=>a.date===agendaFilterDate);
+if((agendaFilter==='done'||agendaFilter==='cancel') && (agendaFilterDate||agendaFilterDateTo)){
+  // só 'De' = dia específico; 'De' + 'Até' = intervalo; só 'Até' = tudo até essa data
+  const fLo = agendaFilterDate || '';
+  const fHi = agendaFilterDateTo || (agendaFilterDate ? agendaFilterDate : '');
+  list = list.filter(a=> (!fLo || a.date>=fLo) && (!fHi || a.date<=fHi));
+}
 const agendaFilterClientObj = agendaClientFilter ? clients.find(c=>c.id===agendaClientFilter) : null;
 if(agendaFilterClientObj) list = list.filter(a=> a.clientId ? a.clientId===agendaFilterClientObj.id : normalizeSearch(a.clientName)===normalizeSearch(agendaFilterClientObj.name));
 const AGENDA_SORT_FNS = {
@@ -3082,7 +3088,17 @@ ${(()=>{
         ${agendaClientFilter ? `<button type="button" class="btn btn-ghost icon-btn" id="agenda-client-filter-clear" title="Limpar filtro de cliente">${icon('close')}</button>` : ''}
       </div>
     </div>
-    ${(agendaFilter==='done'||agendaFilter==='cancel') ? `<div class="field" style="max-width:220px;"><label>Filtrar por data</label><input type="date" id="agenda-date-filter" value="${agendaFilterDate||''}"/></div>` : ''}
+    ${(agendaFilter==='done'||agendaFilter==='cancel') ? `
+    <div class="field" style="max-width:170px;"><label>Data (ou De)</label><input type="date" id="agenda-date-filter" value="${agendaFilterDate||''}"/></div>
+    <div class="field" style="max-width:170px;"><label>Até (opcional)</label><input type="date" id="agenda-date-filter-to" value="${agendaFilterDateTo||''}"/></div>
+    <div class="flex gap6" style="flex-wrap:wrap;padding-bottom:2px;">
+      <button type="button" class="btn btn-sm" data-agenda-quick="cur">Mês atual</button>
+      <button type="button" class="btn btn-sm" data-agenda-quick="prev">Mês anterior</button>
+      <button type="button" class="btn btn-sm" data-agenda-quick="6">6 meses</button>
+      <button type="button" class="btn btn-sm" data-agenda-quick="12">12 meses</button>
+      <button type="button" class="btn btn-sm" data-agenda-quick="24">24 meses</button>
+      ${(agendaFilterDate||agendaFilterDateTo) ? `<button type="button" class="btn btn-sm btn-ghost" id="agenda-date-clear">Limpar datas</button>` : ''}
+    </div>` : ''}
   </div>`;
 })()}
 <div class="card" style="margin-top:14px;">
@@ -3192,6 +3208,22 @@ ${list.length===0 ? `<div class="empty">${icon('agenda')}<p>Nenhum agendamento n
     root.querySelectorAll('#agenda-tabs .tab').forEach(t=>t.addEventListener('click', ()=>{ agendaFilter=t.dataset.f; renderAgenda(root,actions); }));
 const agendaDateFilterInput = root.querySelector('#agenda-date-filter');
 if(agendaDateFilterInput) agendaDateFilterInput.addEventListener('change', ()=>{ agendaFilterDate = agendaDateFilterInput.value; renderAgenda(root,actions); });
+const agendaDateFilterToInput = root.querySelector('#agenda-date-filter-to');
+if(agendaDateFilterToInput) agendaDateFilterToInput.addEventListener('change', ()=>{ agendaFilterDateTo = agendaDateFilterToInput.value; renderAgenda(root,actions); });
+const agendaDateClearBtn = root.querySelector('#agenda-date-clear');
+if(agendaDateClearBtn) agendaDateClearBtn.addEventListener('click', ()=>{ agendaFilterDate=''; agendaFilterDateTo=''; renderAgenda(root,actions); });
+root.querySelectorAll('[data-agenda-quick]').forEach(b=>b.addEventListener('click', ()=>{
+  const q = b.dataset.agendaQuick;
+  const lastDay = mk=>{ const [yy,mm]=mk.split('-').map(Number); return mk+'-'+String(daysInMonth(yy,mm-1)).padStart(2,'0'); };
+  const curMk = currentMonthKey();
+  let fromMk, toMk;
+  if(q==='cur'){ fromMk=curMk; toMk=curMk; }
+  else if(q==='prev'){ fromMk=shiftMonthKey(curMk,-1); toMk=fromMk; }
+  else { fromMk=shiftMonthKey(curMk, -(Number(q)-1)); toMk=curMk; }
+  agendaFilterDate = fromMk+'-01';
+  agendaFilterDateTo = lastDay(toMk);
+  renderAgenda(root,actions);
+}));
 wireSearchableSelect(root, 'agenda-client-filter', clients.map(c=>({id:c.id, label:c.name})), item=>{ agendaClientFilter = item.id; renderAgenda(root,actions); });
 const agendaClientFilterClear = root.querySelector('#agenda-client-filter-clear');
 if(agendaClientFilterClear) agendaClientFilterClear.addEventListener('click', ()=>{ agendaClientFilter=''; renderAgenda(root,actions); });
