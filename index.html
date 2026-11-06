@@ -1154,17 +1154,22 @@ const Store = {
   localSave(){ try{ localStorage.setItem('recoveryhub_data', JSON.stringify(this.data)); }catch(e){} },
   localLoad(){ try{ const raw=localStorage.getItem('recoveryhub_data'); if(raw) this.data={...this.data, ...JSON.parse(raw)}; }catch(e){} },
 
+  stop(){ try{ (this._unsubs||[]).forEach(u=>{ try{u();}catch(e){} }); }catch(e){} this._unsubs=[]; this._inited=false; this.loadedColls=new Set(); this.apptsLoaded=false; },
+
   async init(){
+    // Idempotente: o Firestore pode ser iniciado em paralelo com a leitura do perfil da equipe (ver onAuthStateChanged).
+    if(this._inited) return;
+    this._inited=true; this._unsubs=this._unsubs||[];
     if(typeof firebaseDb!=='undefined' && firebaseDb){
       this.db=firebaseDb; this.mode='firebase';
       setSyncPill('firebase');
       ['clients','services','appointments','transactions','recurringExpenses','assessments','settings','bankAccounts','bankAccountHistory','bankAccountTotalHistory','events','eventParticipants'].forEach(coll=>{
-        this.db.collection(coll).onSnapshot(snap=>{
+        this._unsubs.push(this.db.collection(coll).onSnapshot(snap=>{
           this.data[coll]=snap.docs.map(d=>({id:d.id,...d.data()}));
           if(coll==='appointments') this.apptsLoaded = true;
           this.loadedColls.add(coll);
           this.emit();
-        }, err=>{ console.warn('firebase error',coll,err); setSyncPill('error'); });
+        }, err=>{ console.warn('firebase error',coll,err); setSyncPill('error'); }));
       });
       // seed default services once, if empty
       setTimeout(async ()=>{
@@ -6115,6 +6120,7 @@ function bootApp(){
   Store.init();
   renderView();
   ensureServicesUppercase();
+  showAbsenceAlertPopupOnce(); // os dados podem ja ter chegado antes do onChange ser registrado
   GCal.init();
   setInterval(()=>{ if(GCal.isConnected() && GCal.hasValidToken()) GCal.pullSync(); }, GCAL_PULL_INTERVAL_MS);
 }
@@ -6144,10 +6150,12 @@ if(!firebaseAuth){
   });
   firebaseAuth.onAuthStateChanged(async user=>{
     if(user){
+      try{ Store.init(); }catch(e){ console.warn('init antecipado falhou', e); } // dados do Firestore carregam em paralelo com a leitura do perfil
       const ok = await loadTeamUserProfile(user);
       if(ok){ gate.hidden=true; if(currentTeamUser && currentTeamUser.mustChangePassword){ await showForcePasswordChange(); } renderCurrentUserBox(); bootApp(); }
       else {
         try{ await firebaseAuth.signOut(); }catch(e){}
+        try{ Store.stop(); }catch(e){}
         gate.hidden=false;
         loginErrEl.style.color='';
         loginErrEl.textContent='Usuário bloqueado ou sem cadastro na equipe. Fale com um administrador.';
