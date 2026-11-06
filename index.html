@@ -8,6 +8,12 @@
 <meta name="hosting-provider" content="Netlify">
 <meta name="netlify-deploy" content="https://netlify.new/?utm_campaign=ai-legible&amp;utm_source=meta&amp;utm_medium=referral&amp;utm_id=9402fb58-ca6c-4511-9bd9-dac2f6523a92">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <title>Recovery Hub</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
@@ -650,9 +656,17 @@
   }catch(e){ console.warn('Firebase não configurado ou falhou ao iniciar:', e); firebaseDb=null; firebaseAuth=null; }
 </script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+/* Bibliotecas de exportacao (Excel/PDF) carregadas em segundo plano apos a abertura, sem bloquear o app */
+(function(){
+  function load(src){ return new Promise(function(res){ var s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=res; document.head.appendChild(s); }); }
+  function go(){
+    load("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
+    load("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then(function(){ return load("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"); });
+  }
+  if(document.readyState==="complete") setTimeout(go,0); else window.addEventListener("load", function(){ setTimeout(go,0); });
+})();
+</script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 (function(){
@@ -1130,7 +1144,13 @@ const Store = {
   loadedColls:new Set(), // coleções que já receberam pelo menos 1 snapshot do Firestore (evita ler dados parciais)
   listeners:[],
   onChange(cb){ this.listeners.push(cb); },
-  emit(){ this.listeners.forEach(cb=>cb()); },
+  emit(){
+    // Agrupa renderizacoes: os 12 listeners do Firestore chegam em rajada na abertura; evita redesenhar a tela a cada snapshot.
+    if(this._emitTimer) return;
+    const wait=Math.max(0, 120-(Date.now()-(this._lastEmit||0)));
+    const run=()=>{ this._emitTimer=null; this._lastEmit=Date.now(); this.listeners.forEach(cb=>cb()); };
+    if(wait===0) run(); else this._emitTimer=setTimeout(run, wait);
+  },
   localSave(){ try{ localStorage.setItem('recoveryhub_data', JSON.stringify(this.data)); }catch(e){} },
   localLoad(){ try{ const raw=localStorage.getItem('recoveryhub_data'); if(raw) this.data={...this.data, ...JSON.parse(raw)}; }catch(e){} },
 
